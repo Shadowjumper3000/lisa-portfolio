@@ -1,0 +1,36 @@
+name: Deploy to Hetzner
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Start ssh-agent and add key
+        uses: webfactory/ssh-agent@v0.8.1
+        with:
+          ssh-private-key: ${{ secrets.HETZNER_SSH_KEY }}
+
+      - name: Deploy to Hetzner host
+        env:
+          HETZNER_USER: ${{ secrets.HETZNER_USER }}
+          HETZNER_HOST: ${{ secrets.HETZNER_HOST }}
+          REPO_URL: ${{ secrets.REPO_URL }}
+          PROJECT_DIR: ${{ secrets.PROJECT_DIR }}
+        run: |
+          set -euo pipefail
+          # create directory and clone or pull
+          ssh -o StrictHostKeyChecking=no ${HETZNER_USER}@${HETZNER_HOST} "mkdir -p ${PROJECT_DIR} && cd ${PROJECT_DIR} && if [ -d .git ]; then git pull --rebase; else git clone ${REPO_URL} .; fi"
+
+          # write .env from GitHub secret (PROD_ENV). Add this secret containing the full .env file content.
+          ssh ${HETZNER_USER}@${HETZNER_HOST} "cat > ${PROJECT_DIR}/.env" <<'EOF'
+${{ secrets.PROD_ENV }}
+EOF
+
+          # run docker compose (prod) on remote host
+          ssh ${HETZNER_USER}@${HETZNER_HOST} "cd ${PROJECT_DIR} && docker compose -f deploy/docker-compose.prod.yml pull --ignore-pull-failures || true && docker compose -f deploy/docker-compose.prod.yml up -d --build"

@@ -1,0 +1,37 @@
+services:
+  db:
+    extends:
+      file: docker-compose.yml
+      service: db
+    expose:
+      - 5432
+    restart: unless-stopped
+
+  app:
+    extends:
+      file: docker-compose.yml
+      service: app
+    build:
+      context: ../app
+      dockerfile: Dockerfile
+      target: production
+    expose:
+      - 8080
+    restart: unless-stopped
+
+  web:
+    extends:
+      file: docker-compose.yml
+      service: web
+    build:
+      context: ../web
+      dockerfile: Dockerfile
+      target: production
+    expose:
+      - 80
+    environment:
+      - VITE_API_BASE=${VITE_API_BASE}
+    restart: unless-stopped
+
+volumes:
+  db_data:

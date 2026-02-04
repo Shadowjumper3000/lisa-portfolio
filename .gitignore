@@ -1,0 +1,15 @@
+node_modules/
+dist/
+build/
+.env
+.env.local
+.venv/
+bin/
+vendor/
+coverage.out
+*.log
+*.sqlite
+/.idea/
+.DS_Store
+.vscode/
+npm-debug.log*

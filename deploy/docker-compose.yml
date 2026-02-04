@@ -1,0 +1,59 @@
+services:
+  db:
+    image: portfolio-lisa-db:${VERSION_DB:-latest}
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM postgres:15
+    container_name: portfolio-lisa-db
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-portfolio}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    
+
+  minio:
+    image: minio/minio:latest
+    container_name: portfolio-lisa-minio
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minioadmin}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - minio_data:/data
+    
+
+  app:
+    image: portfolio-lisa-app:${VERSION_APP:-latest}
+    container_name: portfolio-lisa-app
+    environment:
+      - DB_HOST=${DB_HOST:-db}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-postgres}
+      - DB_NAME=${DB_NAME:-portfolio}
+      - JWT_SECRET=${JWT_SECRET:-changemeinproduction}
+      - MINIO_ENDPOINT=${MINIO_ENDPOINT:-minio:9000}
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-minioadmin}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minioadmin}
+      - MINIO_USE_SSL=false
+    depends_on:
+      - db
+      - minio
+    
+
+  web:
+    image: portfolio-lisa-web:${VERSION_WEB:-latest}
+    container_name: portfolio-lisa-web
+    environment:
+      - SERVER_NAME=${SERVER_NAME:-_}
+    depends_on:
+      - app
+    
+
+volumes:
+  db_data:
+  minio_data:
+
