@@ -52,4 +52,8 @@ services:
 volumes:
   db_data:
   minio_data:
+
+networks:
+  default:
+    name: portfolio-lisa-internal
   

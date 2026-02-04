@@ -9,7 +9,8 @@ CREATE TABLE IF NOT EXISTS admin_users (
 CREATE TABLE IF NOT EXISTS gallery_items (
   id SERIAL PRIMARY KEY,
   title TEXT NOT NULL,
-  abstract TEXT,
+  info TEXT,
+  year_created INTEGER,
   story TEXT,
   description TEXT,
   image_path TEXT,

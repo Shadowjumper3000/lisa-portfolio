@@ -8,12 +8,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/gorilla/mux"
 	"github.com/minio/minio-go/v7"
 )
 
@@ -59,7 +62,7 @@ func (s *Server) LoginHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) ListGalleryItems(w http.ResponseWriter, r *http.Request) {
-    rows, err := s.DB.Query("select id, title, abstract, story, description, image_path, created_at from gallery_items order by created_at desc")
+    rows, err := s.DB.Query("select id, title, info, story, description, image_path, year_created, created_at from gallery_items order by created_at desc")
     if err != nil {
         http.Error(w, "db error", http.StatusInternalServerError)
         return
@@ -69,7 +72,7 @@ func (s *Server) ListGalleryItems(w http.ResponseWriter, r *http.Request) {
     var out []GalleryItem
     for rows.Next() {
         var p GalleryItem
-        if err := rows.Scan(&p.ID, &p.Title, &p.Abstract, &p.Story, &p.Description, &p.ImagePath, &p.CreatedAt); err != nil {
+        if err := rows.Scan(&p.ID, &p.Title, &p.Info, &p.Story, &p.Description, &p.ImagePath, &p.YearCreated, &p.CreatedAt); err != nil {
             http.Error(w, "scan error", http.StatusInternalServerError)
             return
         }
@@ -88,7 +91,14 @@ func (s *Server) CreateGalleryItem(w http.ResponseWriter, r *http.Request) {
     }
 
     title := r.FormValue("title")
-    abstract := r.FormValue("abstract")
+    info := r.FormValue("info")
+    yearStr := r.FormValue("yearCreated")
+    yearCreated := 0
+    if yearStr != "" {
+        if y, err := strconv.Atoi(yearStr); err == nil {
+            yearCreated = y
+        }
+    }
     story := r.FormValue("story")
     description := r.FormValue("description")
     
@@ -117,12 +127,14 @@ func (s *Server) CreateGalleryItem(w http.ResponseWriter, r *http.Request) {
         // Ensure bucket exists
         exists, err := s.Minio.BucketExists(ctx, bucketName)
         if err != nil {
-            http.Error(w, "storage error", http.StatusInternalServerError)
+                log.Printf("MinIO BucketExists error: %v", err)
+                http.Error(w, "storage error", http.StatusInternalServerError)
             return
         }
         if !exists {
             err = s.Minio.MakeBucket(ctx, bucketName, minio.MakeBucketOptions{})
             if err != nil {
+                log.Printf("MinIO MakeBucket error: %v", err)
                 http.Error(w, "storage error", http.StatusInternalServerError)
                 return
             }
@@ -138,6 +150,7 @@ func (s *Server) CreateGalleryItem(w http.ResponseWriter, r *http.Request) {
             }`, bucketName)
             err = s.Minio.SetBucketPolicy(ctx, bucketName, policy)
             if err != nil {
+                log.Printf("MinIO SetBucketPolicy error: %v", err)
                 http.Error(w, "storage error", http.StatusInternalServerError)
                 return
             }
@@ -153,6 +166,7 @@ func (s *Server) CreateGalleryItem(w http.ResponseWriter, r *http.Request) {
             ContentType: contentType,
         })
         if err != nil {
+            log.Printf("MinIO PutObject error: %v", err)
             http.Error(w, "upload error", http.StatusInternalServerError)
             return
         }
@@ -162,15 +176,17 @@ func (s *Server) CreateGalleryItem(w http.ResponseWriter, r *http.Request) {
 
     var p GalleryItem
     err = s.DB.QueryRow(
-        "insert into gallery_items (title, abstract, story, description, image_path, created_at) values ($1,$2,$3,$4,$5,$6) returning id, created_at",
-        title, abstract, story, description, imagePath, time.Now()).Scan(&p.ID, &p.CreatedAt)
+        "insert into gallery_items (title, info, story, description, image_path, year_created, created_at) values ($1,$2,$3,$4,$5,$6,$7) returning id, created_at",
+        title, info, story, description, imagePath, yearCreated, time.Now()).Scan(&p.ID, &p.CreatedAt)
     if err != nil {
+        log.Printf("DB insert error: %v", err)
         http.Error(w, "db error", http.StatusInternalServerError)
         return
     }
 
     p.Title = title
-    p.Abstract = abstract
+    p.Info = info
+    p.YearCreated = yearCreated
     p.Story = story
     p.Description = description
     p.ImagePath = imagePath
@@ -228,7 +244,15 @@ func (s *Server) CORSMiddleware(next http.Handler) http.Handler {
     return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
         w.Header().Set("Access-Control-Allow-Origin", "*")
         w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-        w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        // Allow requested headers (for preflight) or fall back to common headers
+        reqHeaders := r.Header.Get("Access-Control-Request-Headers")
+        if reqHeaders != "" {
+            w.Header().Set("Access-Control-Allow-Headers", reqHeaders)
+        } else {
+            w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+        }
+        // Allow credentials if needed
+        w.Header().Set("Access-Control-Allow-Credentials", "true")
         
         if r.Method == "OPTIONS" {
             w.WriteHeader(http.StatusOK)
@@ -261,4 +285,178 @@ func (s *Server) AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 
         next(w, r)
     }
+}
+
+func (s *Server) UpdateGalleryItem(w http.ResponseWriter, r *http.Request) {
+    // expects multipart form similar to CreateGalleryItem
+    vars := mux.Vars(r)
+    idStr := vars["id"]
+    id, err := strconv.Atoi(idStr)
+    if err != nil || id <= 0 {
+        http.Error(w, "invalid id", http.StatusBadRequest)
+        return
+    }
+
+    // Get existing image path so we can delete object if replaced
+    var existingImagePath string
+    if err := s.DB.QueryRow("select image_path from gallery_items where id=$1", id).Scan(&existingImagePath); err != nil {
+        if err == sql.ErrNoRows {
+            http.Error(w, "not found", http.StatusNotFound)
+            return
+        }
+        log.Printf("DB select error: %v", err)
+        http.Error(w, "db error", http.StatusInternalServerError)
+        return
+    }
+
+    if err := r.ParseMultipartForm(10 << 20); err != nil {
+        http.Error(w, "bad request", http.StatusBadRequest)
+        return
+    }
+
+    title := r.FormValue("title")
+    info := r.FormValue("info")
+    yearStr := r.FormValue("yearCreated")
+    yearCreated := 0
+    if yearStr != "" {
+        if y, err := strconv.Atoi(yearStr); err == nil {
+            yearCreated = y
+        }
+    }
+    story := r.FormValue("story")
+    description := r.FormValue("description")
+
+    if title == "" {
+        http.Error(w, "title is required", http.StatusBadRequest)
+        return
+    }
+
+    imagePath := existingImagePath
+
+    // Handle file upload if present
+    file, header, err := r.FormFile("image")
+    if err == nil {
+        defer file.Close()
+
+        ext := filepath.Ext(header.Filename)
+        randomBytes := make([]byte, 16)
+        rand.Read(randomBytes)
+        filename := hex.EncodeToString(randomBytes) + ext
+
+        bucketName := "gallery"
+        ctx := context.Background()
+
+        exists, err := s.Minio.BucketExists(ctx, bucketName)
+        if err != nil {
+            log.Printf("MinIO BucketExists error: %v", err)
+            http.Error(w, "storage error", http.StatusInternalServerError)
+            return
+        }
+        if !exists {
+            err = s.Minio.MakeBucket(ctx, bucketName, minio.MakeBucketOptions{})
+            if err != nil {
+                log.Printf("MinIO MakeBucket error: %v", err)
+                http.Error(w, "storage error", http.StatusInternalServerError)
+                return
+            }
+            policy := fmt.Sprintf(`{
+                "Version": "2012-10-17",
+                "Statement": [{
+                    "Effect": "Allow",
+                    "Principal": {"AWS": ["*"]},
+                    "Action": ["s3:GetObject"],
+                    "Resource": ["arn:aws:s3:::%s/*"]
+                }]
+            }`, bucketName)
+            err = s.Minio.SetBucketPolicy(ctx, bucketName, policy)
+            if err != nil {
+                log.Printf("MinIO SetBucketPolicy error: %v", err)
+                http.Error(w, "storage error", http.StatusInternalServerError)
+                return
+            }
+        }
+
+        contentType := header.Header.Get("Content-Type")
+        if contentType == "" {
+            contentType = "application/octet-stream"
+        }
+
+        _, err = s.Minio.PutObject(ctx, bucketName, filename, file, header.Size, minio.PutObjectOptions{
+            ContentType: contentType,
+        })
+        if err != nil {
+            log.Printf("MinIO PutObject error: %v", err)
+            http.Error(w, "upload error", http.StatusInternalServerError)
+            return
+        }
+
+        // Delete old object if it exists and is in the expected path format
+        if existingImagePath != "" {
+            // existingImagePath expected like /api/images/{bucket}/{object}
+            parts := splitPath(existingImagePath)
+            if len(parts) >= 3 {
+                // parts[0] == "api", parts[1] == "images", parts[2]==bucket, parts[3]==object...
+                // so bucket at index 2, object is join of remaining
+                if parts[0] == "api" && parts[1] == "images" {
+                    bucket := parts[2]
+                    object := ""
+                    if len(parts) >= 4 {
+                        object = parts[3]
+                        if len(parts) > 4 {
+                            for i:=4;i<len(parts);i++ { object = object + "/" + parts[i] }
+                        }
+                    }
+                    if bucket != "" && object != "" {
+                        // remove old object (best-effort)
+                        err := s.Minio.RemoveObject(ctx, bucket, object, minio.RemoveObjectOptions{})
+                        if err != nil {
+                            log.Printf("MinIO RemoveObject warning: %v", err)
+                        }
+                    }
+                }
+            }
+        }
+
+        imagePath = fmt.Sprintf("/api/images/%s/%s", bucketName, filename)
+    }
+
+    // Update DB with new values (keep imagePath as existing if not changed)
+    var p GalleryItem
+    err = s.DB.QueryRow(
+        "update gallery_items set title=$1, info=$2, story=$3, description=$4, image_path=$5, year_created=$6 where id=$7 returning created_at",
+        title, info, story, description, imagePath, yearCreated, id).Scan(&p.CreatedAt)
+    if err != nil {
+        log.Printf("DB update error: %v", err)
+        http.Error(w, "db error", http.StatusInternalServerError)
+        return
+    }
+
+    p.ID = id
+    p.Title = title
+    p.Info = info
+    p.YearCreated = yearCreated
+    p.Story = story
+    p.Description = description
+    p.ImagePath = imagePath
+
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(p)
+}
+
+// splitPath splits a URL path into segments
+func splitPath(p string) []string {
+    out := []string{}
+    cur := ""
+    for _, c := range p {
+        if c == '/' {
+            if cur != "" {
+                out = append(out, cur)
+                cur = ""
+            }
+            continue
+        }
+        cur += string(c)
+    }
+    if cur != "" { out = append(out, cur) }
+    return out
 }
