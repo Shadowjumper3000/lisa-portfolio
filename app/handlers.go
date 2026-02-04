@@ -58,18 +58,18 @@ func (s *Server) LoginHandler(w http.ResponseWriter, r *http.Request) {
     json.NewEncoder(w).Encode(map[string]string{"token": tokenString})
 }
 
-func (s *Server) ListProjects(w http.ResponseWriter, r *http.Request) {
-    rows, err := s.DB.Query("select id, title, description, image_path, created_at from projects order by created_at desc")
+func (s *Server) ListGalleryItems(w http.ResponseWriter, r *http.Request) {
+    rows, err := s.DB.Query("select id, title, abstract, story, description, image_path, created_at from gallery_items order by created_at desc")
     if err != nil {
         http.Error(w, "db error", http.StatusInternalServerError)
         return
     }
     defer rows.Close()
 
-    var out []Project
+    var out []GalleryItem
     for rows.Next() {
-        var p Project
-        if err := rows.Scan(&p.ID, &p.Title, &p.Description, &p.ImagePath, &p.CreatedAt); err != nil {
+        var p GalleryItem
+        if err := rows.Scan(&p.ID, &p.Title, &p.Abstract, &p.Story, &p.Description, &p.ImagePath, &p.CreatedAt); err != nil {
             http.Error(w, "scan error", http.StatusInternalServerError)
             return
         }
@@ -80,7 +80,7 @@ func (s *Server) ListProjects(w http.ResponseWriter, r *http.Request) {
     json.NewEncoder(w).Encode(out)
 }
 
-func (s *Server) CreateProject(w http.ResponseWriter, r *http.Request) {
+func (s *Server) CreateGalleryItem(w http.ResponseWriter, r *http.Request) {
     // Parse multipart form with max 10MB
     if err := r.ParseMultipartForm(10 << 20); err != nil {
         http.Error(w, "bad request", http.StatusBadRequest)
@@ -88,6 +88,8 @@ func (s *Server) CreateProject(w http.ResponseWriter, r *http.Request) {
     }
 
     title := r.FormValue("title")
+    abstract := r.FormValue("abstract")
+    story := r.FormValue("story")
     description := r.FormValue("description")
     
     if title == "" {
@@ -109,7 +111,7 @@ func (s *Server) CreateProject(w http.ResponseWriter, r *http.Request) {
         filename := hex.EncodeToString(randomBytes) + ext
         
         // Upload to MinIO
-        bucketName := "projects"
+        bucketName := "gallery"
         ctx := context.Background()
         
         // Ensure bucket exists
@@ -158,16 +160,18 @@ func (s *Server) CreateProject(w http.ResponseWriter, r *http.Request) {
         imagePath = fmt.Sprintf("/api/images/%s/%s", bucketName, filename)
     }
 
-    var p Project
+    var p GalleryItem
     err = s.DB.QueryRow(
-        "insert into projects (title, description, image_path, created_at) values ($1,$2,$3,$4) returning id, created_at",
-        title, description, imagePath, time.Now()).Scan(&p.ID, &p.CreatedAt)
+        "insert into gallery_items (title, abstract, story, description, image_path, created_at) values ($1,$2,$3,$4,$5,$6) returning id, created_at",
+        title, abstract, story, description, imagePath, time.Now()).Scan(&p.ID, &p.CreatedAt)
     if err != nil {
         http.Error(w, "db error", http.StatusInternalServerError)
         return
     }
 
     p.Title = title
+    p.Abstract = abstract
+    p.Story = story
     p.Description = description
     p.ImagePath = imagePath
 

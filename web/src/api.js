@@ -1,12 +1,12 @@
 const API_BASE = (import.meta.env.VITE_API_BASE) || ''
 
-export async function listProjects(){
-  const res = await fetch(`${API_BASE}/api/projects`)
+export async function listGalleryItems(){
+  const res = await fetch(`${API_BASE}/api/gallery`)
   if(!res.ok) return []
   return res.json()
 }
 
-export async function createProject(data, token){
+export async function createGalleryItem(data, token){
   const formData = new FormData()
   formData.append('title', data.title)
   formData.append('description', data.description)
@@ -14,7 +14,7 @@ export async function createProject(data, token){
     formData.append('image', data.image)
   }
   
-  const res = await fetch(`${API_BASE}/api/projects`, {
+  const res = await fetch(`${API_BASE}/api/gallery`, {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${token}` },
     body: formData
