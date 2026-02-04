@@ -9,6 +9,12 @@ export default function ImageModal({ item, onClose }) {
 
   if (!item) return null
 
+  const imageSrc = item.image_path || item.imagePath || item.image || ''
+  const year = item.year || item.yearCreated || ''
+
+  // Keys we already render explicitly so we don't duplicate them below
+  const explicitKeys = new Set(['id','title','image_path','imagePath','image','year','yearCreated','created_at','info','description','story','medium','dimensions','notes'])
+
   return (
     <div className="image-modal-overlay" onClick={onClose}>
       <div className="image-modal" onClick={e => e.stopPropagation()}>
@@ -16,21 +22,34 @@ export default function ImageModal({ item, onClose }) {
         <div className="image-modal-split">
           <div className="image-modal-left">
             <div className="image-modal-left-inner">
-              <img src={item.image_path} alt={item.title} />
+              <img src={imageSrc} alt={item.title || 'image'} />
             </div>
           </div>
-            <div className="image-modal-right">
-              <div className="image-modal-info">
-                <h2>{item.title}</h2>
-                {item.year && <div className="modal-year">{item.year}</div>}
-                {item.info && <p className="modal-info"><strong>Info:</strong> {item.info}</p>}
-                {item.description && <p className="modal-description"><strong>Description:</strong> {item.description}</p>}
-                {item.story && <p className="modal-story"><strong>Story:</strong> {item.story}</p>}
-                {item.medium && <p><strong>Medium:</strong> {item.medium}</p>}
-                {item.dimensions && <p><strong>Dimensions:</strong> {item.dimensions}</p>}
-                {item.notes && <p className="modal-notes">{item.notes}</p>}
-              </div>
+          <div className="image-modal-right">
+            <div className="image-modal-info">
+              <h2>{item.title || 'Untitled'}</h2>
+              {year && <div className="modal-year">{year}</div>}
+
+              {item.info && <italic><p className="modal-info">{item.info}</p></italic>}
+              {item.description && <italic><p className="modal-description">{item.description}</p></italic>}
+              {item.story && <p className="modal-story">{item.story}</p>}
+              {item.medium && <p><strong>Medium:</strong> {item.medium}</p>}
+              {item.dimensions && <p><strong>Dimensions:</strong> {item.dimensions}</p>}
+              {item.notes && <p className="modal-notes">{item.notes}</p>}
+
+              {/* Render any other fields present on the item object */}
+              {Object.keys(item).filter(k => !explicitKeys.has(k)).length > 0 && (
+                <div className="modal-extra">
+                  <h4>More details</h4>
+                  {Object.keys(item).filter(k => !explicitKeys.has(k)).map(key => (
+                    item[key] ? (
+                      <p key={key}><strong>{key.replace(/_/g, ' ')}:</strong> {String(item[key])}</p>
+                    ) : null
+                  ))}
+                </div>
+              )}
             </div>
+          </div>
         </div>
       </div>
     </div>

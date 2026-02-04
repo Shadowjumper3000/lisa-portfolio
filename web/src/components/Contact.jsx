@@ -28,8 +28,18 @@ export default function Contact() {
           <p className="description">
             I'm always interested in hearing about new projects and opportunities.
           </p>
-        </div>
-        
+          <div className="contact-details">
+          <p>
+            <strong>Email:</strong>{' '}
+            <a href="mailto:hello@lisaportfolio.com" className="contact-link">
+              hello@lisaportfolio.com
+            </a>
+          </p>
+        <p>
+          <strong>Location:</strong> Available for remote work worldwide
+        </p>
+      </div>
+        </div>        
         <form className="contact-form" onSubmit={handleSubmit}>
           <div className="form-group">
             <label htmlFor="name">Name</label>
@@ -72,18 +82,6 @@ export default function Contact() {
 
           <button type="submit" className="submit-btn">Send Message</button>
         </form>
-      </div>
-
-      <div className="contact-details">
-        <p>
-          <strong>Email:</strong>{' '}
-          <a href="mailto:hello@lisaportfolio.com" className="contact-link">
-            hello@lisaportfolio.com
-          </a>
-        </p>
-        <p>
-          <strong>Location:</strong> Available for remote work worldwide
-        </p>
       </div>
     </section>
   )
