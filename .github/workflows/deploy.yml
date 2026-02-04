@@ -11,128 +11,72 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup SSH agent
-        uses: webfactory/ssh-agent@v0.9.0
+      - name: Deploy to Hetzner
+        uses: appleboy/ssh-action@v1.0.3
         with:
-          ssh-private-key: ${{ secrets.HETZNER_SSH_KEY }}
-
-      - name: Create deployment directory on server
-        env:
-          HETZNER_USER: ${{ secrets.HETZNER_USER }}
-          HETZNER_HOST: ${{ secrets.HETZNER_HOST }}
-          HETZNER_PORT: ${{ secrets.HETZNER_PORT }}
-        run: |
-          ssh -o StrictHostKeyChecking=no -p ${HETZNER_PORT} ${HETZNER_USER}@${HETZNER_HOST} \
-            "mkdir -p ~/portfolio-lisa"
-
-      - name: Clone or update repository on server
-        env:
-          HETZNER_USER: ${{ secrets.HETZNER_USER }}
-          HETZNER_HOST: ${{ secrets.HETZNER_HOST }}
-          HETZNER_PORT: ${{ secrets.HETZNER_PORT }}
-        run: |
-          ssh -o StrictHostKeyChecking=no -p ${HETZNER_PORT} ${HETZNER_USER}@${HETZNER_HOST} \
-            "cd ~/portfolio-lisa && \
-             if [ -d .git ]; then \
-               git fetch origin && \
-               git checkout prod && \
-               git pull origin prod; \
-             else \
-               git clone -b prod https://github.com/${{ github.repository }}.git .; \
-             fi"
-
-      - name: Generate environment configuration
-        env:
-          HETZNER_USER: ${{ secrets.HETZNER_USER }}
-          HETZNER_HOST: ${{ secrets.HETZNER_HOST }}
-          HETZNER_PORT: ${{ secrets.HETZNER_PORT }}
-        run: |
-          ssh -o StrictHostKeyChecking=no -p ${HETZNER_PORT} ${HETZNER_USER}@${HETZNER_HOST} \
-            "cat > ~/portfolio-lisa/.env" <<'EOF'
-          # Database Configuration
-          DB_HOST=db
-          DB_PORT=5432
-          DB_USER=${{ secrets.DB_USER }}
-          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-          DB_NAME=${{ secrets.DB_NAME }}
-          
-          # JWT Secret
-          JWT_SECRET=${{ secrets.JWT_SECRET }}
-          
-          # MinIO Configuration
-          MINIO_ROOT_USER=${{ secrets.MINIO_ROOT_USER }}
-          MINIO_ROOT_PASSWORD=${{ secrets.MINIO_ROOT_PASSWORD }}
-          MINIO_ENDPOINT=minio:9000
-          MINIO_ACCESS_KEY=${{ secrets.MINIO_ROOT_USER }}
-          MINIO_SECRET_KEY=${{ secrets.MINIO_ROOT_PASSWORD }}
-          MINIO_USE_SSL=false
-          
-          # Admin User for Seeding
-          ADMIN_USERNAME=${{ secrets.ADMIN_USERNAME }}
-          ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
-          
-          # Other Configuration
-          VITE_API_BASE=${{ secrets.VITE_API_BASE }}
-          SERVER_NAME=${{ secrets.SERVER_NAME }}
-          EOF
-
-      - name: Update database init script with admin credentials
-        env:
-          HETZNER_USER: ${{ secrets.HETZNER_USER }}
-          HETZNER_HOST: ${{ secrets.HETZNER_HOST }}
-          HETZNER_PORT: ${{ secrets.HETZNER_PORT }}
-        run: |
-          ssh -o StrictHostKeyChecking=no -p ${HETZNER_PORT} ${HETZNER_USER}@${HETZNER_HOST} \
-            "cd ~/portfolio-lisa && \
-             sed -i \"s/VALUES ('admin', 'password')/VALUES ('${{ secrets.ADMIN_USERNAME }}', '${{ secrets.ADMIN_PASSWORD }}')/g\" db/init/init.sql"
-
-      - name: Pull latest Docker images
-        env:
-          HETZNER_USER: ${{ secrets.HETZNER_USER }}
-          HETZNER_HOST: ${{ secrets.HETZNER_HOST }}
-          HETZNER_PORT: ${{ secrets.HETZNER_PORT }}
-        run: |
-          ssh -o StrictHostKeyChecking=no -p ${HETZNER_PORT} ${HETZNER_USER}@${HETZNER_HOST} \
-            "cd ~/portfolio-lisa && \
-             docker compose -f deploy/docker-compose.prod.yml pull --ignore-pull-failures || true"
-
-      - name: Build and start services
-        env:
-          HETZNER_USER: ${{ secrets.HETZNER_USER }}
-          HETZNER_HOST: ${{ secrets.HETZNER_HOST }}
-          HETZNER_PORT: ${{ secrets.HETZNER_PORT }}
-        run: |
-          ssh -o StrictHostKeyChecking=no -p ${HETZNER_PORT} ${HETZNER_USER}@${HETZNER_HOST} \
-            "cd ~/portfolio-lisa && \
-             docker compose -f deploy/docker-compose.prod.yml up -d --build"
-
-      - name: Wait for database to be ready
-        env:
-          HETZNER_USER: ${{ secrets.HETZNER_USER }}
-          HETZNER_HOST: ${{ secrets.HETZNER_HOST }}
-          HETZNER_PORT: ${{ secrets.HETZNER_PORT }}
-        run: |
-          ssh -o StrictHostKeyChecking=no -p ${HETZNER_PORT} ${HETZNER_USER}@${HETZNER_HOST} \
-            "sleep 10"
-
-      - name: Seed admin user in database
-        env:
-          HETZNER_USER: ${{ secrets.HETZNER_USER }}
-          HETZNER_HOST: ${{ secrets.HETZNER_HOST }}
-          HETZNER_PORT: ${{ secrets.HETZNER_PORT }}
-        run: |
-          ssh -o StrictHostKeyChecking=no -p ${HETZNER_PORT} ${HETZNER_USER}@${HETZNER_HOST} \
-            "cd ~/portfolio-lisa && \
-             docker compose -f deploy/docker-compose.prod.yml exec -T db \
-             psql -U ${{ secrets.DB_USER }} -d ${{ secrets.DB_NAME }} -f /docker-entrypoint-initdb.d/init.sql || true"
-
-      - name: Verify deployment
-        env:
-          HETZNER_USER: ${{ secrets.HETZNER_USER }}
-          HETZNER_HOST: ${{ secrets.HETZNER_HOST }}
-          HETZNER_PORT: ${{ secrets.HETZNER_PORT }}
-        run: |
-          ssh -o StrictHostKeyChecking=no -p ${HETZNER_PORT} ${HETZNER_USER}@${HETZNER_HOST} \
-            "cd ~/portfolio-lisa && \
-             docker compose -f deploy/docker-compose.prod.yml ps"
+          host: ${{ secrets.HETZNER_HOST }}
+          username: ${{ secrets.HETZNER_USER }}
+          key: ${{ secrets.HETZNER_SSH_KEY }}
+          port: ${{ secrets.HETZNER_PORT }}
+          script: |
+            # Create deployment directory
+            mkdir -p ~/portfolio-lisa
+            
+            # Clone or update repository
+            cd ~/portfolio-lisa
+            if [ -d .git ]; then
+              git fetch origin
+              git checkout prod
+              git pull origin prod
+            else
+              git clone -b prod https://github.com/${{ github.repository }}.git .
+            fi
+            
+            # Create .env file with secrets
+            cat > ~/portfolio-lisa/.env <<'EOF'
+            # Database Configuration
+            DB_HOST=db
+            DB_PORT=5432
+            DB_USER=${{ secrets.DB_USER }}
+            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            DB_NAME=${{ secrets.DB_NAME }}
+            
+            # JWT Secret
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            
+            # MinIO Configuration
+            MINIO_ROOT_USER=${{ secrets.MINIO_ROOT_USER }}
+            MINIO_ROOT_PASSWORD=${{ secrets.MINIO_ROOT_PASSWORD }}
+            MINIO_ENDPOINT=minio:9000
+            MINIO_ACCESS_KEY=${{ secrets.MINIO_ROOT_USER }}
+            MINIO_SECRET_KEY=${{ secrets.MINIO_ROOT_PASSWORD }}
+            MINIO_USE_SSL=false
+            
+            # Admin User for Seeding
+            ADMIN_USERNAME=${{ secrets.ADMIN_USERNAME }}
+            ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
+            
+            # Other Configuration
+            VITE_API_BASE=${{ secrets.VITE_API_BASE }}
+            SERVER_NAME=${{ secrets.SERVER_NAME }}
+            EOF
+            
+            # Update database init script with admin credentials
+            cd ~/portfolio-lisa
+            sed -i "s/VALUES ('admin', 'password')/VALUES ('${{ secrets.ADMIN_USERNAME }}', '${{ secrets.ADMIN_PASSWORD }}')/g" db/init/init.sql
+            
+            # Pull latest Docker images
+            docker compose -f deploy/docker-compose.prod.yml pull --ignore-pull-failures || true
+            
+            # Build and start services
+            docker compose -f deploy/docker-compose.prod.yml up -d --build
+            
+            # Wait for database to be ready
+            sleep 10
+            
+            # Seed admin user in database
+            docker compose -f deploy/docker-compose.prod.yml exec -T db psql -U ${{ secrets.DB_USER }} -d ${{ secrets.DB_NAME }} -f /docker-entrypoint-initdb.d/init.sql || true
+            
+            # Show deployment status
+            docker compose -f deploy/docker-compose.prod.yml ps
 
