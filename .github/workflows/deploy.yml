@@ -3,37 +3,47 @@ name: Deploy to Hetzner
 on:
   push:
     branches: [ prod ]
+  workflow_dispatch:
 
 jobs:
   deploy:
+    name: Deploy to Hetzner
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy to Hetzner
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p ${{ secrets.HETZNER_PORT }} -H ${{ secrets.HETZNER_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy application
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.HETZNER_HOST }}
           username: ${{ secrets.HETZNER_USER }}
           key: ${{ secrets.HETZNER_SSH_KEY }}
           port: ${{ secrets.HETZNER_PORT }}
+          passphrase: ""
+          script_stop: false
           script: |
-            # Create deployment directory
-            mkdir -p ~/portfolio-lisa
+            set -e
+            APP_DIR="/home/${{ secrets.HETZNER_USER }}/portfolio-lisa"
+            
+            # Create directory if needed
+            mkdir -p $APP_DIR && cd $APP_DIR
             
             # Clone or update repository
-            cd ~/portfolio-lisa
-            if [ -d .git ]; then
-              git fetch origin
-              git checkout prod
-              git pull origin prod
-            else
+            if [ ! -d ".git" ]; then
               git clone -b prod https://github.com/${{ github.repository }}.git .
+            else
+              git fetch origin && git reset --hard origin/prod && git clean -fd
             fi
             
-            # Create .env file with secrets
-            cat > ~/portfolio-lisa/.env <<'EOF'
+            # Create .env file from individual secrets
+            cat > .env << EOF
             # Database Configuration
             DB_HOST=db
             DB_PORT=5432
@@ -61,22 +71,39 @@ jobs:
             SERVER_NAME=${{ secrets.SERVER_NAME }}
             EOF
             
+            # Debug: Check if .env was created and has content
+            echo "📋 Checking .env file:"
+            ls -lh .env
+            echo "📄 .env has $(wc -l < .env) lines"
+            
             # Update database init script with admin credentials
-            cd ~/portfolio-lisa
             sed -i "s/VALUES ('admin', 'password')/VALUES ('${{ secrets.ADMIN_USERNAME }}', '${{ secrets.ADMIN_PASSWORD }}')/g" db/init/init.sql
             
-            # Pull latest Docker images
-            docker compose -f deploy/docker-compose.prod.yml pull --ignore-pull-failures || true
+            # Deploy with Docker Compose
+            cd deploy
+            docker compose -f docker-compose.prod.yml down --remove-orphans || true
+            docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
             
-            # Build and start services
-            docker compose -f deploy/docker-compose.prod.yml up -d --build
-            
-            # Wait for database to be ready
-            sleep 10
+            # Wait for services to start
+            echo "⏳ Waiting for services to start..."
+            sleep 15
             
             # Seed admin user in database
+            cd $APP_DIR
             docker compose -f deploy/docker-compose.prod.yml exec -T db psql -U ${{ secrets.DB_USER }} -d ${{ secrets.DB_NAME }} -f /docker-entrypoint-initdb.d/init.sql || true
             
-            # Show deployment status
-            docker compose -f deploy/docker-compose.prod.yml ps
+            # Verify deployment
+            cd deploy
+            if docker compose -f docker-compose.prod.yml ps | grep -q "Up"; then
+              echo "✅ Deployment successful"
+              docker compose -f docker-compose.prod.yml ps
+            else
+              echo "❌ Deployment failed"
+              docker compose -f docker-compose.prod.yml logs --tail=50
+              exit 1
+            fi
+            
+            # Cleanup .env
+            cd $APP_DIR
+            rm -f .env
 
