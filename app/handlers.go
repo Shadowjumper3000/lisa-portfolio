@@ -221,6 +221,7 @@ func (s *Server) ServeImage(w http.ResponseWriter, r *http.Request) {
     ctx := context.Background()
     object, err := s.Minio.GetObject(ctx, bucketName, objectName, minio.GetObjectOptions{})
     if err != nil {
+        log.Printf("MinIO GetObject error for %s/%s: %v", bucketName, objectName, err)
         http.Error(w, "not found", http.StatusNotFound)
         return
     }
@@ -229,6 +230,7 @@ func (s *Server) ServeImage(w http.ResponseWriter, r *http.Request) {
     // Get object info for content type
     stat, err := object.Stat()
     if err != nil {
+        log.Printf("MinIO Stat error for %s/%s: %v", bucketName, objectName, err)
         http.Error(w, "not found", http.StatusNotFound)
         return
     }
