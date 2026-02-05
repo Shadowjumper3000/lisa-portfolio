@@ -39,7 +39,6 @@ body {
   min-height: 100vh;
   background-color: #ffffff;
   position: relative;
-  z-index: 1;
 }
 
 /* Typography */
@@ -161,7 +160,6 @@ p {
   margin-bottom: var(--spacing-xl);
   background-color: #ffffff;
   position: relative;
-  z-index: 1;
 }
 
 .section-header {
@@ -385,6 +383,7 @@ p {
 .contact-section {
   border-top: 1px solid var(--color-border);
   padding-top: var(--spacing-lg);
+  position: relative;
 }
 
 .contact-container {
@@ -1018,7 +1017,7 @@ p {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 10000;
   padding: 2rem;
 }
 
