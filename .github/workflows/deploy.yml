@@ -1,105 +1,76 @@
-name: Deploy to Hetzner
+name: Deploy to Production
 
 on:
   push:
-    branches: [ prod ]
-  workflow_dispatch:
+    branches: [prod]
 
 jobs:
   deploy:
-    name: Deploy to Hetzner
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Deploy application
-        uses: appleboy/ssh-action@v1.0.3
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
         with:
-          host: ${{ secrets.HETZNER_HOST }}
-          username: ${{ secrets.HETZNER_USER }}
-          key: ${{ secrets.HETZNER_SSH_KEY }}
-          port: ${{ secrets.HETZNER_PORT }}
-          debug: true
-          script: |
-            set -e
-            APP_DIR="/home/${{ secrets.HETZNER_USER }}/portfolio-lisa"
+          ssh-private-key: ${{ secrets.HETZNER_SSH_KEY }}
+      
+      - name: Deploy
+        run: |
+          ssh -o StrictHostKeyChecking=accept-new ${{ secrets.HETZNER_USER }}@${{ secrets.HETZNER_HOST }} << 'EOF'
+            DEPLOY_DIR="/home/${{ secrets.HETZNER_USER }}/portfolio-lisa"
             
-            echo "🔍 Debug: Starting deployment..."
-            echo "📁 App directory: $APP_DIR"
+            # Ensure GitHub is in known_hosts
+            mkdir -p ~/.ssh
+            ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
             
-            # Create directory if needed
-            mkdir -p $APP_DIR && cd $APP_DIR
-            echo "✅ Directory created/verified"
-            
-            # Clone or update repository
-            if [ ! -d ".git" ]; then
-              echo "📥 Cloning repository..."
-              git clone -b prod https://github.com/${{ github.repository }}.git .
+            # Check if directory exists and is a valid git repo
+            if [ -d "$DEPLOY_DIR/.git" ]; then
+              echo "Repository exists, updating..."
+              cd "$DEPLOY_DIR"
+              git fetch origin prod
+              git reset --hard origin/prod
             else
-              echo "🔄 Updating repository..."
-              git fetch origin && git reset --hard origin/prod && git clean -fd
+              echo "Repository not found, cloning..."
+              rm -rf "$DEPLOY_DIR"
+              git clone https://github.com/${{ github.repository }}.git "$DEPLOY_DIR"
+              cd "$DEPLOY_DIR"
+              git checkout prod
             fi
-            echo "✅ Repository updated"
             
-            # Create .env file from individual secrets
-            echo "📝 Creating .env file..."
-            cat > .env << 'EOF'
-            # Database Configuration
-            DB_HOST=db
-            DB_PORT=5432
-            DB_USER=${{ secrets.DB_USER }}
-            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-            DB_NAME=${{ secrets.DB_NAME }}
-            
-            # JWT Secret
-            JWT_SECRET=${{ secrets.JWT_SECRET }}
-            
-            # MinIO Configuration
-            MINIO_ROOT_USER=${{ secrets.MINIO_ROOT_USER }}
-            MINIO_ROOT_PASSWORD=${{ secrets.MINIO_ROOT_PASSWORD }}
-            MINIO_ENDPOINT=minio:9000
-            MINIO_ACCESS_KEY=${{ secrets.MINIO_ROOT_USER }}
-            MINIO_SECRET_KEY=${{ secrets.MINIO_ROOT_PASSWORD }}
-            MINIO_USE_SSL=false
-            
-            # Admin User for Seeding
-            ADMIN_USERNAME=${{ secrets.ADMIN_USERNAME }}
-            ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
-            
-            # Other Configuration
-            VITE_API_BASE=${{ secrets.VITE_API_BASE }}
-            SERVER_NAME=${{ secrets.SERVER_NAME }}
-            EOF
-            
-            # Debug: Check if .env was created and has content
-            echo "📋 Checking .env file:"
-            ls -lh .env
-            echo "📄 .env has $(wc -l < .env) lines"
+            # Create .env file with secrets
+            cat > "$DEPLOY_DIR/.env" << 'ENVEOF'
+          DB_HOST=db
+          DB_PORT=5432
+          DB_USER=${{ secrets.DB_USER }}
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          DB_NAME=${{ secrets.DB_NAME }}
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          MINIO_ROOT_USER=${{ secrets.MINIO_ROOT_USER }}
+          MINIO_ROOT_PASSWORD=${{ secrets.MINIO_ROOT_PASSWORD }}
+          MINIO_ENDPOINT=minio:9000
+          MINIO_ACCESS_KEY=${{ secrets.MINIO_ROOT_USER }}
+          MINIO_SECRET_KEY=${{ secrets.MINIO_ROOT_PASSWORD }}
+          MINIO_USE_SSL=false
+          ADMIN_USERNAME=${{ secrets.ADMIN_USERNAME }}
+          ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
+          VITE_API_BASE=${{ secrets.VITE_API_BASE }}
+          SERVER_NAME=${{ secrets.SERVER_NAME }}
+          ENVEOF
             
             # Update database init script with admin credentials
-            echo "🔐 Updating admin credentials in init script..."
-            sed -i "s/VALUES ('admin', 'password')/VALUES ('${{ secrets.ADMIN_USERNAME }}', '${{ secrets.ADMIN_PASSWORD }}')/g" db/init/init.sql
+            sed -i "s/VALUES ('admin', 'password')/VALUES ('${{ secrets.ADMIN_USERNAME }}', '${{ secrets.ADMIN_PASSWORD }}')/g" "$DEPLOY_DIR/db/init/init.sql"
             
             # Deploy with Docker Compose
-            echo "🐳 Starting Docker Compose deployment..."
-            cd deploy
+            cd "$DEPLOY_DIR/deploy"
             docker compose -f docker-compose.prod.yml down --remove-orphans || true
             docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
             
             # Wait for services to start
-            echo "⏳ Waiting for services to start..."
             sleep 15
             
             # Seed admin user in database
-            echo "🌱 Seeding admin user..."
-            cd $APP_DIR
-            docker compose -f deploy/docker-compose.prod.yml exec -T db psql -U ${{ secrets.DB_USER }} -d ${{ secrets.DB_NAME }} -f /docker-entrypoint-initdb.d/init.sql || true
+            docker compose -f docker-compose.prod.yml exec -T db psql -U ${{ secrets.DB_USER }} -d ${{ secrets.DB_NAME }} -f /docker-entrypoint-initdb.d/init.sql || true
             
             # Verify deployment
-            echo "🔍 Verifying deployment..."
-            cd deploy
             if docker compose -f docker-compose.prod.yml ps | grep -q "Up"; then
               echo "✅ Deployment successful"
               docker compose -f docker-compose.prod.yml ps
@@ -110,9 +81,8 @@ jobs:
             fi
             
             # Cleanup .env
-            echo "🧹 Cleaning up .env file..."
-            cd $APP_DIR
-            rm -f .env
+            rm -f "$DEPLOY_DIR/.env"
             
             echo "🎉 Deployment completed successfully!"
+          EOF
 
