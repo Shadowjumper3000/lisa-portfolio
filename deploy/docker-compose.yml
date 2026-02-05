@@ -1,11 +1,13 @@
+name: portfolio-lisa
+
 services:
   db:
-    image: lisa-gallery-db:${VERSION_DB:-latest}
+    image: portfolio-lisa-db:${VERSION_DB:-latest}
     build:
       context: .
       dockerfile_inline: |
         FROM postgres:15
-    container_name: lisa-gallery-db
+    container_name: portfolio-lisa-db
     environment:
       POSTGRES_USER: ${DB_USER:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
@@ -16,7 +18,7 @@ services:
 
   minio:
     image: minio/minio:latest
-    container_name: lisa-gallery-minio
+    container_name: portfolio-lisa-minio
     command: server /data --console-address ":9001"
     environment:
       - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minioadmin}
@@ -26,8 +28,8 @@ services:
     
 
   app:
-    image: lisa-gallery-app:${VERSION_APP:-latest}
-    container_name: lisa-gallery-app
+    image: portfolio-lisa-app:${VERSION_APP:-latest}
+    container_name: portfolio-lisa-app
     environment:
       - DB_HOST=${DB_HOST:-db}
       - DB_PORT=${DB_PORT:-5432}
@@ -45,8 +47,8 @@ services:
     
 
   web:
-    image: lisa-gallery-web:${VERSION_WEB:-latest}
-    container_name: lisa-gallery-web
+    image: portfolio-lisa-web:${VERSION_WEB:-latest}
+    container_name: portfolio-lisa-web
     environment:
       - SERVER_NAME=${SERVER_NAME:-_}
     depends_on:
@@ -55,7 +57,7 @@ services:
 
 volumes:
   db_data:
-    name: lisa-gallery-db-data
+    name: portfolio-lisa-db-data
   minio_data:
-    name: lisa-gallery-minio-data
+    name: portfolio-lisa-minio-data
 
