@@ -16,7 +16,7 @@ jobs:
       - name: Deploy
         run: |
           ssh -o StrictHostKeyChecking=accept-new ${{ secrets.HETZNER_USER }}@${{ secrets.HETZNER_HOST }} << 'EOF'
-            DEPLOY_DIR="/home/${{ secrets.HETZNER_USER }}/portfolio-lisa"
+            DEPLOY_DIR="/home/${{ secrets.HETZNER_USER }}/lisa-gallery"
             
             # Ensure GitHub is in known_hosts
             mkdir -p ~/.ssh
