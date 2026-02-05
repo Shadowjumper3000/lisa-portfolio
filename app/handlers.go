@@ -84,8 +84,8 @@ func (s *Server) ListGalleryItems(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) CreateGalleryItem(w http.ResponseWriter, r *http.Request) {
-    // Parse multipart form with max 10MB
-    if err := r.ParseMultipartForm(10 << 20); err != nil {
+    // Parse multipart form with max 500MB
+    if err := r.ParseMultipartForm(500 << 20); err != nil {
         http.Error(w, "bad request", http.StatusBadRequest)
         return
     }
