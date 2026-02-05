@@ -50,13 +50,13 @@ services:
 
 volumes:
   db_data:
-    name: portfolio-lisa-db-data
+    name: lisa-gallery-db-data
   minio_data:
-    name: portfolio-lisa-minio-data
+    name: lisa-gallery-minio-data
 
 networks:
   default:
-    name: portfolio-lisa-internal
+    name: lisa-gallery-internal
   proxy:
     external: true
     name: proxy
