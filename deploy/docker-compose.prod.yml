@@ -10,6 +10,15 @@ services:
       - 5432
     restart: unless-stopped
 
+  minio:
+    extends:
+      file: docker-compose.yml
+      service: minio
+    expose:
+      - 9000
+      - 9001
+    restart: unless-stopped
+
   app:
     extends:
       file: docker-compose.yml
@@ -39,6 +48,8 @@ services:
 volumes:
   db_data:
     name: portfolio-lisa-db-data
+  minio_data:
+    name: portfolio-lisa-minio-data
 
 networks:
   default:
