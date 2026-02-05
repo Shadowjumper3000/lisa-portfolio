@@ -14,11 +14,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup SSH
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -p ${{ secrets.HETZNER_PORT }} -H ${{ secrets.HETZNER_HOST }} >> ~/.ssh/known_hosts
-
       - name: Deploy application
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -26,24 +21,31 @@ jobs:
           username: ${{ secrets.HETZNER_USER }}
           key: ${{ secrets.HETZNER_SSH_KEY }}
           port: ${{ secrets.HETZNER_PORT }}
-          passphrase: ""
-          script_stop: false
+          debug: true
           script: |
             set -e
             APP_DIR="/home/${{ secrets.HETZNER_USER }}/portfolio-lisa"
             
+            echo "🔍 Debug: Starting deployment..."
+            echo "📁 App directory: $APP_DIR"
+            
             # Create directory if needed
             mkdir -p $APP_DIR && cd $APP_DIR
+            echo "✅ Directory created/verified"
             
             # Clone or update repository
             if [ ! -d ".git" ]; then
+              echo "📥 Cloning repository..."
               git clone -b prod https://github.com/${{ github.repository }}.git .
             else
+              echo "🔄 Updating repository..."
               git fetch origin && git reset --hard origin/prod && git clean -fd
             fi
+            echo "✅ Repository updated"
             
             # Create .env file from individual secrets
-            cat > .env << EOF
+            echo "📝 Creating .env file..."
+            cat > .env << 'EOF'
             # Database Configuration
             DB_HOST=db
             DB_PORT=5432
@@ -77,9 +79,11 @@ jobs:
             echo "📄 .env has $(wc -l < .env) lines"
             
             # Update database init script with admin credentials
+            echo "🔐 Updating admin credentials in init script..."
             sed -i "s/VALUES ('admin', 'password')/VALUES ('${{ secrets.ADMIN_USERNAME }}', '${{ secrets.ADMIN_PASSWORD }}')/g" db/init/init.sql
             
             # Deploy with Docker Compose
+            echo "🐳 Starting Docker Compose deployment..."
             cd deploy
             docker compose -f docker-compose.prod.yml down --remove-orphans || true
             docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
@@ -89,10 +93,12 @@ jobs:
             sleep 15
             
             # Seed admin user in database
+            echo "🌱 Seeding admin user..."
             cd $APP_DIR
             docker compose -f deploy/docker-compose.prod.yml exec -T db psql -U ${{ secrets.DB_USER }} -d ${{ secrets.DB_NAME }} -f /docker-entrypoint-initdb.d/init.sql || true
             
             # Verify deployment
+            echo "🔍 Verifying deployment..."
             cd deploy
             if docker compose -f docker-compose.prod.yml ps | grep -q "Up"; then
               echo "✅ Deployment successful"
@@ -104,6 +110,9 @@ jobs:
             fi
             
             # Cleanup .env
+            echo "🧹 Cleaning up .env file..."
             cd $APP_DIR
             rm -f .env
+            
+            echo "🎉 Deployment completed successfully!"
 
