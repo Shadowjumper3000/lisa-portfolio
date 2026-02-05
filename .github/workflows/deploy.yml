@@ -16,7 +16,7 @@ jobs:
       - name: Deploy
         run: |
           ssh -o StrictHostKeyChecking=accept-new ${{ secrets.HETZNER_USER }}@${{ secrets.HETZNER_HOST }} << 'EOF'
-            DEPLOY_DIR="/home/${{ secrets.HETZNER_USER }}/lisa-gallery"
+            DEPLOY_DIR="/home/${{ secrets.HETZNER_USER }}/portfolio-lisa"
             
             # Ensure GitHub is in known_hosts
             mkdir -p ~/.ssh
@@ -61,22 +61,22 @@ jobs:
             
             # Deploy with Docker Compose
             cd "$DEPLOY_DIR/deploy"
-            docker compose -f docker-compose.prod.yml down --remove-orphans || true
-            docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
+            docker compose -p portfolio-lisa -f docker-compose.prod.yml down --remove-orphans || true
+            docker compose -p portfolio-lisa -f docker-compose.prod.yml up -d --build --remove-orphans
             
             # Wait for services to start
             sleep 15
             
             # Seed admin user in database
-            docker compose -f docker-compose.prod.yml exec -T db psql -U ${{ secrets.DB_USER }} -d ${{ secrets.DB_NAME }} -f /docker-entrypoint-initdb.d/init.sql || true
+            docker compose -p portfolio-lisa -f docker-compose.prod.yml exec -T db psql -U ${{ secrets.DB_USER }} -d ${{ secrets.DB_NAME }} -f /docker-entrypoint-initdb.d/init.sql || true
             
             # Verify deployment
-            if docker compose -f docker-compose.prod.yml ps | grep -q "Up"; then
+            if docker compose -p portfolio-lisa -f docker-compose.prod.yml ps | grep -q "Up"; then
               echo "✅ Deployment successful"
-              docker compose -f docker-compose.prod.yml ps
+              docker compose -p portfolio-lisa -f docker-compose.prod.yml ps
             else
               echo "❌ Deployment failed"
-              docker compose -f docker-compose.prod.yml logs --tail=50
+              docker compose -p portfolio-lisa -f docker-compose.prod.yml logs --tail=50
               exit 1
             fi
             

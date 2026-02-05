@@ -1,3 +1,5 @@
+name: portfolio-lisa
+
 services:
   db:
     extends:
@@ -51,11 +53,11 @@ services:
 
 volumes:
   db_data:
-    name: lisa-gallery-db-data
+    name: portfolio-lisa-db-data
   minio_data:
-    name: lisa-gallery-minio-data
+    name: portfolio-lisa-minio-data
 
 networks:
   default:
-    name: lisa-gallery-internal
+    name: portfolio-lisa-internal
   
