@@ -53,6 +53,8 @@ func main() {
     if err != nil {
         log.Fatalf("minio init: %v", err)
     }
+    
+    log.Printf("MinIO client initialized: endpoint=%s, useSSL=%v", endpoint, useSSL)
 
     srv := &Server{DB: db, Minio: minioClient}
 
