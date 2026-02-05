@@ -43,6 +43,9 @@ services:
       - 80
     environment:
       - VITE_API_BASE=${VITE_API_BASE}
+    networks:
+      - default
+      - proxy
     restart: unless-stopped
 
 volumes:
@@ -54,3 +57,6 @@ volumes:
 networks:
   default:
     name: portfolio-lisa-internal
+  proxy:
+    external: true
+    name: proxy
