@@ -445,6 +445,69 @@ func (s *Server) UpdateGalleryItem(w http.ResponseWriter, r *http.Request) {
     json.NewEncoder(w).Encode(p)
 }
 
+func (s *Server) DeleteGalleryItem(w http.ResponseWriter, r *http.Request) {
+    vars := mux.Vars(r)
+    idStr := vars["id"]
+    id, err := strconv.Atoi(idStr)
+    if err != nil || id <= 0 {
+        http.Error(w, "invalid id", http.StatusBadRequest)
+        return
+    }
+
+    // Get existing image path so we can delete the object from MinIO
+    var imagePath string
+    if err := s.DB.QueryRow("select image_path from gallery_items where id=$1", id).Scan(&imagePath); err != nil {
+        if err == sql.ErrNoRows {
+            http.Error(w, "not found", http.StatusNotFound)
+            return
+        }
+        log.Printf("DB select error: %v", err)
+        http.Error(w, "db error", http.StatusInternalServerError)
+        return
+    }
+
+    // Delete from database
+    result, err := s.DB.Exec("delete from gallery_items where id=$1", id)
+    if err != nil {
+        log.Printf("DB delete error: %v", err)
+        http.Error(w, "db error", http.StatusInternalServerError)
+        return
+    }
+
+    rowsAffected, _ := result.RowsAffected()
+    if rowsAffected == 0 {
+        http.Error(w, "not found", http.StatusNotFound)
+        return
+    }
+
+    // Delete image from MinIO if it exists
+    if imagePath != "" {
+        parts := splitPath(imagePath)
+        if len(parts) >= 3 && parts[0] == "api" && parts[1] == "images" {
+            bucket := parts[2]
+            object := ""
+            if len(parts) >= 4 {
+                object = parts[3]
+                if len(parts) > 4 {
+                    for i := 4; i < len(parts); i++ {
+                        object = object + "/" + parts[i]
+                    }
+                }
+            }
+            if bucket != "" && object != "" {
+                ctx := context.Background()
+                err := s.Minio.RemoveObject(ctx, bucket, object, minio.RemoveObjectOptions{})
+                if err != nil {
+                    log.Printf("MinIO RemoveObject warning: %v", err)
+                }
+            }
+        }
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(map[string]string{"status": "deleted"})
+}
+
 // splitPath splits a URL path into segments
 func splitPath(p string) []string {
     out := []string{}
