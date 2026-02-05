@@ -16,7 +16,8 @@ CMD ["sh", "-c", "go run ."]
 # Build stage
 FROM golang:1.20-alpine AS build
 WORKDIR /src
-COPY go.mod .
+COPY go.mod go.sum ./
+RUN go mod download
 COPY . .
 RUN go build -o /app/server ./
 
