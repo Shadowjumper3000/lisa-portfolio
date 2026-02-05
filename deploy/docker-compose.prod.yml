@@ -38,6 +38,7 @@ services:
 
 volumes:
   db_data:
+    name: portfolio-lisa-db-data
 
 networks:
   default:
