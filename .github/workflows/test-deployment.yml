@@ -38,6 +38,9 @@ jobs:
           cd deploy
           docker compose -f docker-compose.prod.yml config
 
+      - name: Create proxy network
+        run: docker network create proxy
+
       - name: Build all services
         run: |
           cd deploy
