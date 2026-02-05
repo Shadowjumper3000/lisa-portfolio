@@ -67,6 +67,7 @@ func main() {
     r.HandleFunc("/api/gallery", srv.ListGalleryItems).Methods("GET", "OPTIONS")
     r.HandleFunc("/api/gallery", srv.AuthMiddleware(srv.CreateGalleryItem)).Methods("POST", "OPTIONS")
     r.HandleFunc("/api/gallery/{id}", srv.AuthMiddleware(srv.UpdateGalleryItem)).Methods("PUT", "OPTIONS")
+    r.HandleFunc("/api/gallery/{id}", srv.AuthMiddleware(srv.DeleteGalleryItem)).Methods("DELETE", "OPTIONS")
     r.PathPrefix("/api/images/").HandlerFunc(srv.ServeImage).Methods("GET", "OPTIONS")
     // health endpoint exposes server name and basic status
     r.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {

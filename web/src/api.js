@@ -44,6 +44,14 @@ export async function updateGalleryItem(id, data, token){
   return res.json()
 }
 
+export async function deleteGalleryItem(id, token){
+  const res = await fetch(`${API_BASE}/api/gallery/${id}`, {
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${token}` }
+  })
+  return res.json()
+}
+
 export async function login(creds){
   const res = await fetch(`${API_BASE}/api/auth/login`, {
     method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(creds)

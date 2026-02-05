@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { listGalleryItems, createGalleryItem, updateGalleryItem } from '../api'
+import { listGalleryItems, createGalleryItem, updateGalleryItem, deleteGalleryItem } from '../api'
 
 export default function AdminDashboard() {
   const [items, setItems] = useState([])
@@ -110,6 +110,26 @@ export default function AdminDashboard() {
     }
   }
 
+  const handleDelete = async (itemId) => {
+    if (!window.confirm('Are you sure you want to delete this item? This action cannot be undone.')) {
+      return
+    }
+
+    try {
+      const token = localStorage.getItem('adminToken')
+      if (!token) {
+        navigate('/admin/login')
+        return
+      }
+
+      await deleteGalleryItem(itemId, token)
+      setItems(prev => prev.filter(item => item.id !== itemId))
+      setMessage('Item deleted successfully')
+    } catch (err) {
+      setMessage('Failed to delete item')
+    }
+  }
+
   const handleLogout = () => {
     localStorage.removeItem('adminToken')
     navigate('/')
@@ -179,6 +199,7 @@ export default function AdminDashboard() {
                     </div>
                     <div className="item-actions">
                       <button className="btn-primary" onClick={()=>handleEditClick(item)}>Edit</button>
+                      <button className="btn-secondary" onClick={()=>handleDelete(item.id)} style={{backgroundColor: '#dc3545', color: 'white'}}>Delete</button>
                     </div>
                     <div className="admin-item-info">
                       <h3>{item.title}</h3>
