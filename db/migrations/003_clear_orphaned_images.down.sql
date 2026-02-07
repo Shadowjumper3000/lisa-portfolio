@@ -1,0 +1,2 @@
+-- Rollback: no-op since we can't restore deleted data
+-- This migration is meant for fresh deployments
