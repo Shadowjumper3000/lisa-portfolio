@@ -4,6 +4,7 @@ WORKDIR /app
 COPY go.mod go.sum* ./
 RUN if [ -f go.mod ]; then go mod download; fi
 COPY . .
+COPY ../db/migrations /app/migrations
 
 # Add an entrypoint that ensures modules are downloaded inside the container at start
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
@@ -24,5 +25,6 @@ RUN go build -o /app/server ./
 # Production stage
 FROM alpine:3.18 AS production
 COPY --from=build /app/server /server
+COPY --from=build /src/../db/migrations /app/migrations
 EXPOSE 8080
 ENTRYPOINT ["/server"]

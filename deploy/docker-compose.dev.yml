@@ -30,6 +30,8 @@ services:
       target: development
     ports:
       - "8080:8080"
+    volumes:
+      - ../db/migrations:/app/migrations:ro
     restart: unless-stopped
     
 
