@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -15,6 +17,45 @@ import (
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
+
+func initGalleryBucket(minioClient *minio.Client) error {
+	ctx := context.Background()
+	bucketName := "gallery"
+	
+	// Check if bucket exists
+	exists, err := minioClient.BucketExists(ctx, bucketName)
+	if err != nil {
+		return fmt.Errorf("check bucket exists: %w", err)
+	}
+	
+	// Create bucket if it doesn't exist
+	if !exists {
+		err = minioClient.MakeBucket(ctx, bucketName, minio.MakeBucketOptions{})
+		if err != nil {
+			return fmt.Errorf("create bucket: %w", err)
+		}
+		log.Printf("Created MinIO bucket: %s", bucketName)
+	}
+	
+	// Set public read policy
+	policy := `{
+		"Version": "2012-10-17",
+		"Statement": [{
+			"Effect": "Allow",
+			"Principal": {"AWS": ["*"]},
+			"Action": ["s3:GetObject"],
+			"Resource": ["arn:aws:s3:::gallery/*"]
+		}]
+	}`
+	
+	err = minioClient.SetBucketPolicy(ctx, bucketName, policy)
+	if err != nil {
+		return fmt.Errorf("set bucket policy: %w", err)
+	}
+	
+	log.Printf("Gallery bucket initialized with public read policy")
+	return nil
+}
 
 func runMigrations(db *sql.DB) error {
 	driver, err := postgres.WithInstance(db, &postgres.Config{})
@@ -84,6 +125,11 @@ func main() {
     }
     
     log.Printf("MinIO client initialized: endpoint=%s, useSSL=%v", endpoint, useSSL)
+
+	// Initialize gallery bucket with public read policy
+	if err := initGalleryBucket(minioClient); err != nil {
+		log.Printf("Warning: failed to initialize gallery bucket: %v", err)
+	}
 
     srv := &Server{DB: db, Minio: minioClient}
 
