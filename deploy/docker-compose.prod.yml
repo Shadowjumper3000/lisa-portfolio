@@ -45,8 +45,8 @@ services:
         VITE_CONTACT_EMAIL: ${VITE_CONTACT_EMAIL:-hello@example.com}
         VITE_INSTAGRAM_URL: ${VITE_INSTAGRAM_URL:-#}
         VITE_TWITTER_URL: ${VITE_TWITTER_URL:-#}
-    ports:
-      - "80:80"
+    expose:
+      - 80
     networks:
       - default
       - proxy
