@@ -7,11 +7,35 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/gorilla/mux"
 	_ "github.com/lib/pq"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
+
+func runMigrations(db *sql.DB) error {
+	driver, err := postgres.WithInstance(db, &postgres.Config{})
+	if err != nil {
+		return err
+	}
+
+	m, err := migrate.NewWithDatabaseInstance(
+		"file:///app/migrations",
+		"postgres", driver)
+	if err != nil {
+		return err
+	}
+
+	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		return err
+	}
+
+	log.Println("Database migrations completed successfully")
+	return nil
+}
 
 func main() {
     dsn := os.Getenv("DATABASE_URL")
@@ -30,6 +54,11 @@ func main() {
         log.Fatalf("db open: %v", err)
     }
     defer db.Close()
+
+	// Run database migrations
+	if err := runMigrations(db); err != nil {
+		log.Fatalf("failed to run migrations: %v", err)
+	}
 
     // Initialize MinIO client
     endpoint := os.Getenv("MINIO_ENDPOINT")
