@@ -197,8 +197,11 @@ func (s *Server) CreateGalleryItem(w http.ResponseWriter, r *http.Request) {
 func (s *Server) ServeImage(w http.ResponseWriter, r *http.Request) {
     // Extract bucket and object from path: /api/images/{bucket}/{object}
     path := r.URL.Path
+    log.Printf("ServeImage: Full path: %s", path)
+    
     // Remove "/api/images/" prefix
     path = path[len("/api/images/"):]
+    log.Printf("ServeImage: After prefix removal: %s", path)
     
     // Split into bucket and object
     bucketEnd := 0
@@ -209,12 +212,14 @@ func (s *Server) ServeImage(w http.ResponseWriter, r *http.Request) {
         }
     }
     if bucketEnd == 0 {
+        log.Printf("ServeImage: Invalid path format (no slash found): %s", path)
         http.Error(w, "invalid path", http.StatusBadRequest)
         return
     }
     
     bucketName := path[:bucketEnd]
     objectName := path[bucketEnd+1:]
+    log.Printf("ServeImage: Attempting to fetch bucket=%s, object=%s", bucketName, objectName)
     
     // Get object from MinIO
     ctx := context.Background()
@@ -233,6 +238,8 @@ func (s *Server) ServeImage(w http.ResponseWriter, r *http.Request) {
         http.Error(w, "not found", http.StatusNotFound)
         return
     }
+    
+    log.Printf("ServeImage: Successfully serving %s/%s (%d bytes)", bucketName, objectName, stat.Size)
     
     w.Header().Set("Content-Type", stat.ContentType)
     w.Header().Set("Content-Length", fmt.Sprintf("%d", stat.Size))
