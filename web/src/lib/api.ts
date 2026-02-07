@@ -25,7 +25,6 @@ export interface Image {
   title: string;
   description: string;
   info?: string;
-  story?: string;
   yearCreated?: number;
   image_path: string;
   created_at: string;

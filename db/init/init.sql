@@ -11,7 +11,6 @@ CREATE TABLE IF NOT EXISTS gallery_items (
   title TEXT NOT NULL,
   info TEXT,
   year_created INTEGER,
-  story TEXT,
   description TEXT,
   image_path TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now()

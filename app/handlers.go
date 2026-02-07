@@ -62,7 +62,7 @@ func (s *Server) LoginHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) ListGalleryItems(w http.ResponseWriter, r *http.Request) {
-    rows, err := s.DB.Query("select id, title, info, story, description, image_path, year_created, created_at from gallery_items order by created_at desc")
+    rows, err := s.DB.Query("select id, title, info, description, image_path, year_created, created_at from gallery_items order by created_at desc")
     if err != nil {
         http.Error(w, "db error", http.StatusInternalServerError)
         return
@@ -72,7 +72,7 @@ func (s *Server) ListGalleryItems(w http.ResponseWriter, r *http.Request) {
     var out []GalleryItem
     for rows.Next() {
         var p GalleryItem
-        if err := rows.Scan(&p.ID, &p.Title, &p.Info, &p.Story, &p.Description, &p.ImagePath, &p.YearCreated, &p.CreatedAt); err != nil {
+        if err := rows.Scan(&p.ID, &p.Title, &p.Info, &p.Description, &p.ImagePath, &p.YearCreated, &p.CreatedAt); err != nil {
             http.Error(w, "scan error", http.StatusInternalServerError)
             return
         }
@@ -99,7 +99,6 @@ func (s *Server) CreateGalleryItem(w http.ResponseWriter, r *http.Request) {
             yearCreated = y
         }
     }
-    story := r.FormValue("story")
     description := r.FormValue("description")
     
     if title == "" {
@@ -176,8 +175,8 @@ func (s *Server) CreateGalleryItem(w http.ResponseWriter, r *http.Request) {
 
     var p GalleryItem
     err = s.DB.QueryRow(
-        "insert into gallery_items (title, info, story, description, image_path, year_created, created_at) values ($1,$2,$3,$4,$5,$6,$7) returning id, created_at",
-        title, info, story, description, imagePath, yearCreated, time.Now()).Scan(&p.ID, &p.CreatedAt)
+        "insert into gallery_items (title, info, description, image_path, year_created, created_at) values ($1,$2,$3,$4,$5,$6) returning id, created_at",
+        title, info, description, imagePath, yearCreated, time.Now()).Scan(&p.ID, &p.CreatedAt)
     if err != nil {
         log.Printf("DB insert error: %v", err)
         http.Error(w, "db error", http.StatusInternalServerError)
@@ -187,7 +186,6 @@ func (s *Server) CreateGalleryItem(w http.ResponseWriter, r *http.Request) {
     p.Title = title
     p.Info = info
     p.YearCreated = yearCreated
-    p.Story = story
     p.Description = description
     p.ImagePath = imagePath
 
@@ -325,7 +323,6 @@ func (s *Server) UpdateGalleryItem(w http.ResponseWriter, r *http.Request) {
             yearCreated = y
         }
     }
-    story := r.FormValue("story")
     description := r.FormValue("description")
 
     if title == "" {
@@ -425,8 +422,8 @@ func (s *Server) UpdateGalleryItem(w http.ResponseWriter, r *http.Request) {
     // Update DB with new values (keep imagePath as existing if not changed)
     var p GalleryItem
     err = s.DB.QueryRow(
-        "update gallery_items set title=$1, info=$2, story=$3, description=$4, image_path=$5, year_created=$6 where id=$7 returning created_at",
-        title, info, story, description, imagePath, yearCreated, id).Scan(&p.CreatedAt)
+        "update gallery_items set title=$1, info=$2, description=$3, image_path=$4, year_created=$5 where id=$6 returning created_at",
+        title, info, description, imagePath, yearCreated, id).Scan(&p.CreatedAt)
     if err != nil {
         log.Printf("DB update error: %v", err)
         http.Error(w, "db error", http.StatusInternalServerError)
@@ -437,7 +434,6 @@ func (s *Server) UpdateGalleryItem(w http.ResponseWriter, r *http.Request) {
     p.Title = title
     p.Info = info
     p.YearCreated = yearCreated
-    p.Story = story
     p.Description = description
     p.ImagePath = imagePath
 
@@ -538,8 +534,8 @@ func (s *Server) GetGalleryItemByID(w http.ResponseWriter, r *http.Request) {
 
     var p GalleryItem
     err = s.DB.QueryRow(
-        "select id, title, info, story, description, image_path, year_created, created_at from gallery_items where id=$1",
-        id).Scan(&p.ID, &p.Title, &p.Info, &p.Story, &p.Description, &p.ImagePath, &p.YearCreated, &p.CreatedAt)
+        "select id, title, info, description, image_path, year_created, created_at from gallery_items where id=$1",
+        id).Scan(&p.ID, &p.Title, &p.Info, &p.Description, &p.ImagePath, &p.YearCreated, &p.CreatedAt)
     
     if err != nil {
         if err == sql.ErrNoRows {
@@ -568,7 +564,7 @@ func (s *Server) UpdateGalleryItemJSON(w http.ResponseWriter, r *http.Request) {
     var req struct {
         Title       string `json:"title"`
         Description string `json:"description"`
-        Category    string `json:"category"`
+        YearCreated int    `json:"yearCreated"`
     }
 
     if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -579,8 +575,8 @@ func (s *Server) UpdateGalleryItemJSON(w http.ResponseWriter, r *http.Request) {
     // Get existing item to preserve other fields
     var p GalleryItem
     err = s.DB.QueryRow(
-        "select id, title, info, story, description, image_path, year_created, created_at from gallery_items where id=$1",
-        id).Scan(&p.ID, &p.Title, &p.Info, &p.Story, &p.Description, &p.ImagePath, &p.YearCreated, &p.CreatedAt)
+        "select id, title, info, description, image_path, year_created, created_at from gallery_items where id=$1",
+        id).Scan(&p.ID, &p.Title, &p.Info, &p.Description, &p.ImagePath, &p.YearCreated, &p.CreatedAt)
     
     if err != nil {
         if err == sql.ErrNoRows {
@@ -599,15 +595,14 @@ func (s *Server) UpdateGalleryItemJSON(w http.ResponseWriter, r *http.Request) {
     if req.Description != "" {
         p.Description = req.Description
     }
-    // Category maps to info field
-    if req.Category != "" {
-        p.Info = req.Category
+    if req.YearCreated > 0 {
+        p.YearCreated = req.YearCreated
     }
 
     // Save to database
     _, err = s.DB.Exec(
-        "update gallery_items set title=$1, info=$2, description=$3 where id=$4",
-        p.Title, p.Info, p.Description, id)
+        "update gallery_items set title=$1, description=$2, year_created=$3 where id=$4",
+        p.Title, p.Description, p.YearCreated, id)
     
     if err != nil {
         log.Printf("DB update error: %v", err)

@@ -29,7 +29,7 @@ export default function AdminDashboard() {
 
   // Edit state
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ title: "", description: "", category: "" });
+  const [editForm, setEditForm] = useState({ title: "", description: "", yearCreated: 0 });
 
   const handleUpload = async (files: FileList | null) => {
     if (!files?.length) return;
@@ -38,7 +38,7 @@ export default function AdminDashboard() {
     try {
       for (const file of Array.from(files)) {
         const fd = new FormData();
-        fd.append("file", file);
+        fd.append("image", file);
         fd.append("title", file.name.replace(/\.[^.]+$/, ""));
         await uploadImage(fd, setUploadProgress);
       }
@@ -67,7 +67,7 @@ export default function AdminDashboard() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<Pick<Image, "title" | "description" | "category">> }) =>
+    mutationFn: ({ id, data }: { id: string; data: Partial<Pick<Image, "title" | "description" | "yearCreated">> }) =>
       updateImage(id, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["images"] });
@@ -86,7 +86,7 @@ export default function AdminDashboard() {
 
   const startEdit = (img: Image) => {
     setEditingId(img.id);
-    setEditForm({ title: img.title, description: img.description || "", category: img.category || "" });
+    setEditForm({ title: img.title, description: img.description || "", yearCreated: img.yearCreated || 0 });
   };
 
   const handleLogout = () => {
@@ -224,9 +224,10 @@ export default function AdminDashboard() {
                           placeholder="Description"
                         />
                         <Input
-                          value={editForm.category}
-                          onChange={(e) => setEditForm((f) => ({ ...f, category: e.target.value }))}
-                          placeholder="Category"
+                          type="text"
+                          value={editForm.yearCreated || ""}
+                          onChange={(e) => setEditForm((f) => ({ ...f, yearCreated: parseInt(e.target.value) || 0 }))}
+                          placeholder="Year (e.g., 2024)"
                         />
                       </div>
                     ) : (

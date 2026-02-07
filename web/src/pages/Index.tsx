@@ -20,15 +20,24 @@ const Index = () => {
       ? imgs.find((i) => i.id === settings.about_image_id)?.url || null
       : null;
 
-    // If not set, pick random different images
+    // If both are set, use them
     if (heroSet && aboutSet) return { heroUrl: heroSet, aboutUrl: aboutSet };
 
+    // Shuffle images for random selection
     const shuffled = [...imgs].sort(() => Math.random() - 0.5);
-    const fallbackHero = heroSet || shuffled[0]?.url || null;
-    const fallbackAbout =
-      aboutSet || (shuffled.length > 1 ? shuffled[1]?.url : shuffled[0]?.url) || null;
+    
+    // Determine hero image (from settings or first random)
+    const finalHero = heroSet || shuffled[0]?.url || null;
+    
+    // Determine about image (from settings or next random that's different from hero)
+    let finalAbout = aboutSet;
+    if (!finalAbout) {
+      // Find first image in shuffled that's different from hero
+      const differentImage = shuffled.find(img => img.url !== finalHero);
+      finalAbout = differentImage?.url || shuffled[0]?.url || null;
+    }
 
-    return { heroUrl: fallbackHero, aboutUrl: fallbackAbout };
+    return { heroUrl: finalHero, aboutUrl: finalAbout };
   }, [images, settings]);
 
   return (

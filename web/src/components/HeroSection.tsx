@@ -10,19 +10,25 @@ export default function HeroSection({ backgroundUrl }: HeroSectionProps) {
 
   return (
     <section className="relative h-screen w-full overflow-hidden flex">
-      {/* Left 1/3 overlay with bright background */}
-      <div className="w-full md:w-1/3 bg-secondary/50 flex items-center justify-center relative z-10">
+      {/* Mobile: Background image with overlay */}
+      <div
+        className="absolute inset-0 md:hidden bg-cover bg-center"
+        style={{ backgroundImage: `url(${bg})` }}
+      />
+      
+      {/* Left 1/3 overlay with bright background - mobile has semi-transparent overlay */}
+      <div className="w-full md:w-1/3 bg-background/40 md:bg-secondary/50 flex items-center justify-center relative z-10 backdrop-blur-sm md:backdrop-blur-none">
         <motion.div
           initial={{ opacity: 0, x: -40 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.8, ease: "easeOut" }}
-          className="px-8 md:px-12 lg:px-16 w-full"
+          className="px-8 md:px-12 lg:px-16 w-full text-center md:text-left"
         >
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif font-bold text-foreground leading-tight">
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif font-bold text-foreground leading-tight drop-shadow-lg">
             Lisa<br />Schnabel
           </h1>
-          <p className="mt-6 text-base md:text-lg text-muted-foreground font-light leading-relaxed">
-            Dream Imagery and Abstraction in Oil and Acrylic.
+          <p className="mt-6 text-base md:text-lg text-slate-900 md:text-foreground font-light leading-relaxed drop-shadow-md">
+            Dream Imagery and Abstraction <br />in Oil and Acrylic.
           </p>
         </motion.div>
       </div>
