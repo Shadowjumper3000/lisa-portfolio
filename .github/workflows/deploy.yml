@@ -53,6 +53,9 @@ jobs:
           ADMIN_USERNAME=${{ secrets.ADMIN_USERNAME }}
           ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
           VITE_API_BASE=${{ secrets.VITE_API_BASE }}
+          VITE_CONTACT_EMAIL=${{ vars.VITE_CONTACT_EMAIL }}
+          VITE_INSTAGRAM_URL=${{ vars.VITE_INSTAGRAM_URL }}
+          VITE_TWITTER_URL=${{ vars.VITE_TWITTER_URL }}
           SERVER_NAME=${{ secrets.SERVER_NAME }}
           ENVEOF
             

@@ -1,0 +1,17 @@
+node_modules
+npm-debug.log
+.git
+.gitignore
+.env
+.env.local
+.env.*.local
+dist
+.vscode
+.idea
+*.md
+!README.md
+.eslintcache
+coverage
+.DS_Store
+bun.lockb
+.lovable
