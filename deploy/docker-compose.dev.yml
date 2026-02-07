@@ -26,7 +26,7 @@ services:
       service: app
     build:
       context: ../app
-      dockerfile: Dockerfile
+      dockerfile: ../deploy/Dockerfile.app
       target: development
     ports:
       - "8080:8080"
@@ -39,15 +39,21 @@ services:
       service: web
     build:
       context: ../web
-      dockerfile: Dockerfile
+      dockerfile: ../deploy/Dockerfile.web
       target: development
     ports:
-      - "80:3000"
-    environment:
-      - VITE_API_BASE=http://localhost:8080
+      - "80:8080"
     volumes:
-      - ../web:/usr/src/app
-      - /usr/src/app/node_modules
+      - ../web/src:/usr/src/app/src
+      - ../web/public:/usr/src/app/public
+      - ../web/index.html:/usr/src/app/index.html
+      - ../web/vite.config.ts:/usr/src/app/vite.config.ts
+      - ../web/tsconfig.json:/usr/src/app/tsconfig.json
+      - ../web/tsconfig.app.json:/usr/src/app/tsconfig.app.json
+      - ../web/tsconfig.node.json:/usr/src/app/tsconfig.node.json
+      - ../web/tailwind.config.ts:/usr/src/app/tailwind.config.ts
+      - ../web/postcss.config.js:/usr/src/app/postcss.config.js
+      - ../web/components.json:/usr/src/app/components.json
     restart: unless-stopped
     
 

@@ -63,13 +63,30 @@ func main() {
     // Apply CORS middleware to all routes
     r.Use(srv.CORSMiddleware)
 
+    // Auth endpoints
     r.HandleFunc("/api/auth/login", srv.LoginHandler).Methods("POST", "OPTIONS")
-    r.HandleFunc("/api/gallery", srv.ListGalleryItems).Methods("GET", "OPTIONS")
-    r.HandleFunc("/api/gallery", srv.AuthMiddleware(srv.CreateGalleryItem)).Methods("POST", "OPTIONS")
-    r.HandleFunc("/api/gallery/{id}", srv.AuthMiddleware(srv.UpdateGalleryItem)).Methods("PUT", "OPTIONS")
-    r.HandleFunc("/api/gallery/{id}", srv.AuthMiddleware(srv.DeleteGalleryItem)).Methods("DELETE", "OPTIONS")
+    
+    // Images endpoints
+    r.HandleFunc("/api/images", srv.ListGalleryItems).Methods("GET", "OPTIONS")
+    r.HandleFunc("/api/images/{id}", srv.GetGalleryItemByID).Methods("GET", "OPTIONS")
+    r.HandleFunc("/api/images", srv.AuthMiddleware(srv.CreateGalleryItem)).Methods("POST", "OPTIONS")
+    r.HandleFunc("/api/images/{id}", srv.AuthMiddleware(srv.UpdateGalleryItemJSON)).Methods("PUT", "OPTIONS")
+    r.HandleFunc("/api/images/{id}", srv.AuthMiddleware(srv.DeleteGalleryItem)).Methods("DELETE", "OPTIONS")
     r.PathPrefix("/api/images/").HandlerFunc(srv.ServeImage).Methods("GET", "OPTIONS")
-    // health endpoint exposes server name and basic status
+    
+    // Contact endpoint
+    r.HandleFunc("/api/contact", srv.HandleContact).Methods("POST", "OPTIONS")
+    
+    // Settings endpoint
+    r.HandleFunc("/api/settings", srv.GetSettings).Methods("GET", "OPTIONS")
+    r.HandleFunc("/api/settings", srv.AuthMiddleware(srv.UpdateSettings)).Methods("PUT", "OPTIONS")
+    
+    // Serve image files from MinIO
+    // Settings endpoint
+    r.HandleFunc("/api/settings", srv.GetSettings).Methods("GET", "OPTIONS")
+    r.HandleFunc("/api/settings", srv.AuthMiddleware(srv.UpdateSettings)).Methods("PUT", "OPTIONS")
+    
+    // Health endpoint
     r.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
         serverName := os.Getenv("SERVER_NAME")
         if serverName == "" {

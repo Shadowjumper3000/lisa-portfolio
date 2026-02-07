@@ -27,7 +27,7 @@ services:
       service: app
     build:
       context: ../app
-      dockerfile: Dockerfile
+      dockerfile: ../deploy/Dockerfile.app
       target: production
     expose:
       - 8080
@@ -39,12 +39,10 @@ services:
       service: web
     build:
       context: ../web
-      dockerfile: Dockerfile
+      dockerfile: ../deploy/Dockerfile.web
       target: production
-    expose:
-      - 80
-    environment:
-      - VITE_API_BASE=${VITE_API_BASE}
+    ports:
+      - "80:80"
     networks:
       - default
       - proxy

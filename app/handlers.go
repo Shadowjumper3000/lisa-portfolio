@@ -525,3 +525,183 @@ func splitPath(p string) []string {
     if cur != "" { out = append(out, cur) }
     return out
 }
+
+// GetGalleryItemByID retrieves a single gallery item
+func (s *Server) GetGalleryItemByID(w http.ResponseWriter, r *http.Request) {
+    vars := mux.Vars(r)
+    idStr := vars["id"]
+    id, err := strconv.Atoi(idStr)
+    if err != nil || id <= 0 {
+        http.Error(w, "invalid id", http.StatusBadRequest)
+        return
+    }
+
+    var p GalleryItem
+    err = s.DB.QueryRow(
+        "select id, title, info, story, description, image_path, year_created, created_at from gallery_items where id=$1",
+        id).Scan(&p.ID, &p.Title, &p.Info, &p.Story, &p.Description, &p.ImagePath, &p.YearCreated, &p.CreatedAt)
+    
+    if err != nil {
+        if err == sql.ErrNoRows {
+            http.Error(w, "not found", http.StatusNotFound)
+            return
+        }
+        log.Printf("DB select error: %v", err)
+        http.Error(w, "db error", http.StatusInternalServerError)
+        return
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(p)
+}
+
+// UpdateGalleryItemJSON updates gallery item with JSON payload (for new frontend)
+func (s *Server) UpdateGalleryItemJSON(w http.ResponseWriter, r *http.Request) {
+    vars := mux.Vars(r)
+    idStr := vars["id"]
+    id, err := strconv.Atoi(idStr)
+    if err != nil || id <= 0 {
+        http.Error(w, "invalid id", http.StatusBadRequest)
+        return
+    }
+
+    var req struct {
+        Title       string `json:"title"`
+        Description string `json:"description"`
+        Category    string `json:"category"`
+    }
+
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+        http.Error(w, "bad request", http.StatusBadRequest)
+        return
+    }
+
+    // Get existing item to preserve other fields
+    var p GalleryItem
+    err = s.DB.QueryRow(
+        "select id, title, info, story, description, image_path, year_created, created_at from gallery_items where id=$1",
+        id).Scan(&p.ID, &p.Title, &p.Info, &p.Story, &p.Description, &p.ImagePath, &p.YearCreated, &p.CreatedAt)
+    
+    if err != nil {
+        if err == sql.ErrNoRows {
+            http.Error(w, "not found", http.StatusNotFound)
+            return
+        }
+        log.Printf("DB select error: %v", err)
+        http.Error(w, "db error", http.StatusInternalServerError)
+        return
+    }
+
+    // Update fields
+    if req.Title != "" {
+        p.Title = req.Title
+    }
+    if req.Description != "" {
+        p.Description = req.Description
+    }
+    // Category maps to info field
+    if req.Category != "" {
+        p.Info = req.Category
+    }
+
+    // Save to database
+    _, err = s.DB.Exec(
+        "update gallery_items set title=$1, info=$2, description=$3 where id=$4",
+        p.Title, p.Info, p.Description, id)
+    
+    if err != nil {
+        log.Printf("DB update error: %v", err)
+        http.Error(w, "db error", http.StatusInternalServerError)
+        return
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(p)
+}
+
+// HandleContact processes contact form submissions
+func (s *Server) HandleContact(w http.ResponseWriter, r *http.Request) {
+    var req struct {
+        Name    string `json:"name"`
+        Email   string `json:"email"`
+        Message string `json:"message"`
+    }
+
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+        http.Error(w, "bad request", http.StatusBadRequest)
+        return
+    }
+
+    if req.Name == "" || req.Email == "" || req.Message == "" {
+        http.Error(w, "all fields are required", http.StatusBadRequest)
+        return
+    }
+
+    // Store contact submission in database
+    _, err := s.DB.Exec(
+        "insert into contact_submissions (name, email, message, created_at) values ($1, $2, $3, $4)",
+        req.Name, req.Email, req.Message, time.Now())
+    
+    if err != nil {
+        log.Printf("DB insert error: %v", err)
+        http.Error(w, "failed to save contact", http.StatusInternalServerError)
+        return
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(map[string]bool{"success": true})
+}
+
+type SiteSettings struct {
+    HeroImageID  *int `json:"hero_image_id"`
+    AboutImageID *int `json:"about_image_id"`
+}
+
+// GetSettings retrieves site settings
+func (s *Server) GetSettings(w http.ResponseWriter, r *http.Request) {
+    var settings SiteSettings
+    err := s.DB.QueryRow(
+        "select hero_image_id, about_image_id from site_settings where id=1").Scan(
+        &settings.HeroImageID, &settings.AboutImageID)
+    
+    if err != nil {
+        if err == sql.ErrNoRows {
+            // Return empty settings if none exist
+            settings = SiteSettings{}
+        } else {
+            log.Printf("DB select error: %v", err)
+            http.Error(w, "db error", http.StatusInternalServerError)
+            return
+        }
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(settings)
+}
+
+// UpdateSettings updates site settings
+func (s *Server) UpdateSettings(w http.ResponseWriter, r *http.Request) {
+    var settings SiteSettings
+    if err := json.NewDecoder(r.Body).Decode(&settings); err != nil {
+        http.Error(w, "bad request", http.StatusBadRequest)
+        return
+    }
+
+    // Upsert settings
+    _, err := s.DB.Exec(
+        `insert into site_settings (id, hero_image_id, about_image_id, updated_at) 
+         values (1, $1, $2, $3) 
+         on conflict (id) do update 
+         set hero_image_id=$1, about_image_id=$2, updated_at=$3`,
+        settings.HeroImageID, settings.AboutImageID, time.Now())
+    
+    if err != nil {
+        log.Printf("DB upsert error: %v", err)
+        http.Error(w, "db error", http.StatusInternalServerError)
+        return
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(settings)
+}
+
