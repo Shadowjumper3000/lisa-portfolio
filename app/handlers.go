@@ -170,7 +170,8 @@ func (s *Server) CreateGalleryItem(w http.ResponseWriter, r *http.Request) {
             return
         }
         
-        imagePath = fmt.Sprintf("/api/images/%s/%s", bucketName, filename)
+        // Store as bucket/filename format, not as /api/images/bucket/filename
+        imagePath = fmt.Sprintf("%s/%s", bucketName, filename)
     }
 
     var p GalleryItem

@@ -50,9 +50,15 @@ export interface LoginResponse {
 
 // Transform backend response to frontend format
 function transformImage(img: any): Image {
+  // Handle both old format (/api/images/gallery/...) and new format (gallery/...)
+  let url = img.image_path;
+  if (url && !url.startsWith('/api/images/')) {
+    url = `/api/images/${url}`;
+  }
+  
   return {
     ...img,
-    url: img.image_path,
+    url,
     category: img.info,
   };
 }
