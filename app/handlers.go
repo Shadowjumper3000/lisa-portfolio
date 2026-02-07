@@ -619,39 +619,6 @@ func (s *Server) UpdateGalleryItemJSON(w http.ResponseWriter, r *http.Request) {
     json.NewEncoder(w).Encode(p)
 }
 
-// HandleContact processes contact form submissions
-func (s *Server) HandleContact(w http.ResponseWriter, r *http.Request) {
-    var req struct {
-        Name    string `json:"name"`
-        Email   string `json:"email"`
-        Message string `json:"message"`
-    }
-
-    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-        http.Error(w, "bad request", http.StatusBadRequest)
-        return
-    }
-
-    if req.Name == "" || req.Email == "" || req.Message == "" {
-        http.Error(w, "all fields are required", http.StatusBadRequest)
-        return
-    }
-
-    // Store contact submission in database
-    _, err := s.DB.Exec(
-        "insert into contact_submissions (name, email, message, created_at) values ($1, $2, $3, $4)",
-        req.Name, req.Email, req.Message, time.Now())
-    
-    if err != nil {
-        log.Printf("DB insert error: %v", err)
-        http.Error(w, "failed to save contact", http.StatusInternalServerError)
-        return
-    }
-
-    w.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(w).Encode(map[string]bool{"success": true})
-}
-
 type SiteSettings struct {
     HeroImageID  *int `json:"hero_image_id"`
     AboutImageID *int `json:"about_image_id"`

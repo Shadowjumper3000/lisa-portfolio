@@ -32,6 +32,16 @@ RUN npm install
 # Copy source code
 COPY . .
 
+# Accept build arguments for environment variables
+ARG VITE_CONTACT_EMAIL
+ARG VITE_INSTAGRAM_URL
+ARG VITE_TWITTER_URL
+
+# Set environment variables for Vite build
+ENV VITE_CONTACT_EMAIL=${VITE_CONTACT_EMAIL}
+ENV VITE_INSTAGRAM_URL=${VITE_INSTAGRAM_URL}
+ENV VITE_TWITTER_URL=${VITE_TWITTER_URL}
+
 # Build the application
 RUN npm run build
 

@@ -40,12 +40,6 @@ export interface SiteSettings {
   about_image_id?: number;
 }
 
-export interface ContactPayload {
-  name: string;
-  email: string;
-  message: string;
-}
-
 export interface LoginPayload {
   username: string;
   password: string;
@@ -74,13 +68,6 @@ export const fetchImage = async (id: string): Promise<Image> => {
   const img = await request<any>(`/images/${id}`);
   return transformImage(img);
 };
-
-export const submitContact = (data: ContactPayload) =>
-  request<{ success: boolean }>("/contact", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
 
 export const fetchSettings = () => request<SiteSettings>("/settings");
 

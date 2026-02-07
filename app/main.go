@@ -74,9 +74,6 @@ func main() {
     r.HandleFunc("/api/images/{id}", srv.AuthMiddleware(srv.DeleteGalleryItem)).Methods("DELETE", "OPTIONS")
     r.PathPrefix("/api/images/").HandlerFunc(srv.ServeImage).Methods("GET", "OPTIONS")
     
-    // Contact endpoint
-    r.HandleFunc("/api/contact", srv.HandleContact).Methods("POST", "OPTIONS")
-    
     // Settings endpoint
     r.HandleFunc("/api/settings", srv.GetSettings).Methods("GET", "OPTIONS")
     r.HandleFunc("/api/settings", srv.AuthMiddleware(srv.UpdateSettings)).Methods("PUT", "OPTIONS")
