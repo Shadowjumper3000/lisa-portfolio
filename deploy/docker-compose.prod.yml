@@ -26,8 +26,8 @@ services:
       file: docker-compose.yml
       service: app
     build:
-      context: ../app
-      dockerfile: ../deploy/Dockerfile.app
+      context: ..
+      dockerfile: deploy/Dockerfile.app
       target: production
     expose:
       - 8080
