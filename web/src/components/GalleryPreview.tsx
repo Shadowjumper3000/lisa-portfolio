@@ -6,19 +6,21 @@ import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import ImageModal from "@/components/ImageModal";
 
 export default function GalleryPreview() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const { data: images, isLoading } = useQuery({
     queryKey: ["images"],
     queryFn: fetchImages,
   });
 
-  const previewImages = (images || []).slice(0, 6);
+  const previewImages = (images || []).slice(0, 3);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     setIsDragging(true);
@@ -47,7 +49,7 @@ export default function GalleryPreview() {
           <h2 className="text-3xl md:text-4xl font-serif font-bold text-foreground">
             Recent Work
           </h2>
-          <p className="mt-2 text-muted-foreground">Drag to explore — or dive into the full gallery.</p>
+          <p className="mt-2 text-muted-foreground">Explore my latest works or all of them</p>
         </motion.div>
       </div>
 
@@ -62,19 +64,20 @@ export default function GalleryPreview() {
         onMouseLeave={handleMouseUp}
       >
         {isLoading
-          ? Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={i} className="min-w-[280px] md:min-w-[350px] h-[260px] md:h-[320px] rounded-lg shrink-0" />
+          ? Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="flex-1 min-w-[280px] md:min-w-0 h-[260px] md:h-[320px] rounded-lg shrink-0" />
             ))
           : previewImages.map((img, i) => (
-              <motion.div
+              <motion.button
                 key={img.id}
                 initial={{ opacity: 0, scale: 0.95 }}
                 whileInView={{ opacity: 1, scale: 1 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.4, delay: i * 0.1 }}
-                className="min-w-[280px] md:min-w-[350px] shrink-0 snap-center group"
+                onClick={() => !isDragging && setSelectedId(img.id.toString())}
+                className="flex-1 min-w-[280px] md:min-w-0 shrink-0 snap-center group text-left"
               >
-                <div className="relative overflow-hidden rounded-lg aspect-[4/3] bg-muted">
+                <div className="relative overflow-hidden rounded-lg aspect-[4/3] bg-muted cursor-pointer">
                   <img
                     src={img.url}
                     alt={img.title}
@@ -87,7 +90,7 @@ export default function GalleryPreview() {
                 {img.category && (
                   <p className="text-xs text-muted-foreground">{img.category}</p>
                 )}
-              </motion.div>
+              </motion.button>
             ))}
         {!isLoading && previewImages.length === 0 && (
           <div className="min-w-[280px] h-[260px] flex items-center justify-center text-muted-foreground rounded-lg border border-dashed border-border">
@@ -103,6 +106,8 @@ export default function GalleryPreview() {
             <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
           </Link>
         </Button>
+
+      {selectedId && <ImageModal imageId={selectedId} onClose={() => setSelectedId(null)} />}
       </div>
     </section>
   );

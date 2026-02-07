@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -11,7 +11,17 @@ const links = [
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
+  const [show, setShow] = useState(false);
   const { pathname } = useLocation();
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setShow(window.scrollY > 100 || pathname === "/gallery");
+    };
+    handleScroll(); // Call immediately to set initial state
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [pathname]);
 
   const handleClick = (to: string) => {
     setOpen(false);
@@ -22,10 +32,13 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
+    <nav className={cn(
+      "fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border transition-transform duration-300",
+      show ? "translate-y-0" : "-translate-y-full"
+    )}>
       <div className="container flex items-center justify-between h-16">
         <Link to="/" className="font-serif text-xl font-bold text-foreground tracking-wide">
-          Portfolio
+          Lisa Schnabel
         </Link>
 
         {/* Desktop */}

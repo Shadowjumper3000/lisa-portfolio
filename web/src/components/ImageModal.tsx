@@ -37,10 +37,11 @@ export default function ImageModal({ imageId, onClose }: ImageModalProps) {
               {image.description && (
                 <p className="mt-2 text-muted-foreground">{image.description}</p>
               )}
-              <div className="mt-3 flex items-center gap-4 text-xs text-muted-foreground">
-                {image.category && <span className="bg-secondary px-2 py-1 rounded">{image.category}</span>}
-                <span>{new Date(image.created_at).toLocaleDateString()}</span>
-              </div>
+              {image.category && (
+                <div className="mt-3 text-xs text-muted-foreground">
+                  <span className="bg-secondary px-2 py-1 rounded">{image.category}</span>
+                </div>
+              )}
             </div>
           </>
         ) : null}

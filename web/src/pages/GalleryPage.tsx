@@ -66,31 +66,36 @@ export default function GalleryPage() {
           )}
 
           {/* Grid */}
-          <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
             {isLoading
-              ? Array.from({ length: 8 }).map((_, i) => (
-                  <Skeleton key={i} className="aspect-square rounded-lg" />
+              ? Array.from({ length: 6 }).map((_, i) => (
+                  <Skeleton key={i} className="aspect-[4/3] rounded-lg" />
                 ))
               : visible.map((img, i) => (
-                  <motion.button
+                  <motion.div
                     key={img.id}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3, delay: i * 0.05 }}
-                    onClick={() => setSelectedId(img.id)}
-                    className="group relative overflow-hidden rounded-lg aspect-square bg-muted text-left"
+                    className="text-left"
                   >
-                    <img
-                      src={img.url}
-                      alt={img.title}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                      loading="lazy"
-                      onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.svg"; }}
-                    />
-                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-overlay-warm/80 to-transparent p-4 translate-y-full group-hover:translate-y-0 transition-transform duration-300">
-                      <p className="text-sm font-medium text-primary-foreground">{img.title}</p>
-                    </div>
-                  </motion.button>
+                    <button
+                      onClick={() => setSelectedId(img.id)}
+                      className="group relative overflow-hidden rounded-lg aspect-[4/3] bg-muted w-full"
+                    >
+                      <img
+                        src={img.url}
+                        alt={img.title}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        loading="lazy"
+                        onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.svg"; }}
+                      />
+                    </button>
+                    <p className="mt-2 text-sm font-medium text-foreground">{img.title}</p>
+                    {img.category && (
+                      <p className="text-xs text-muted-foreground">{img.category}</p>
+                    )}
+                  </motion.div>
                 ))}
           </div>
 
@@ -108,7 +113,7 @@ export default function GalleryPage() {
         </div>
       </main>
 
-      <ImageModal imageId={selectedId} onClose={() => setSelectedId(null)} />
+      {selectedId && <ImageModal imageId={selectedId} onClose={() => setSelectedId(null)} />}
     </div>
   );
 }
