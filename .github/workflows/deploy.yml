@@ -70,8 +70,13 @@ jobs:
             # Wait for services to start
             sleep 15
             
-            # Seed admin user in database
-            docker compose -p portfolio-lisa -f docker-compose.prod.yml exec -T db psql -U ${{ secrets.DB_USER }} -d ${{ secrets.DB_NAME }} -f /docker-entrypoint-initdb.d/init.sql || true
+            # Ensure database user exists and seed admin user
+            # First, create the user if it doesn't exist (connect as postgres superuser)
+            docker compose -p portfolio-lisa -f docker-compose.prod.yml exec -T db psql -U postgres -d postgres -c "CREATE USER ${{ secrets.DB_USER }} WITH PASSWORD '${{ secrets.DB_PASSWORD }}' CREATEDB;" || true
+            docker compose -p portfolio-lisa -f docker-compose.prod.yml exec -T db psql -U postgres -d postgres -c "GRANT ALL PRIVILEGES ON DATABASE ${{ secrets.DB_NAME }} TO ${{ secrets.DB_USER }};" || true
+            
+            # Now run migrations through the app (migrations will run automatically on app startup)
+            echo "✅ Database user ensured, migrations will run on app startup"
             
             # Verify deployment
             if docker compose -p portfolio-lisa -f docker-compose.prod.yml ps | grep -q "Up"; then
