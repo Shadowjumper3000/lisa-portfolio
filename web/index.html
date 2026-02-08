@@ -3,20 +3,58 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- TODO: Set the document title to the name of your application -->
-    <title>Lovable App</title>
+    <!-- Document title set to the artist name -->
+    <title>Lisa Schnabel</title>
     <meta name="description" content="Lovable Generated Project" />
     <meta name="author" content="Lovable" />
 
     <!-- TODO: Update og:title to match your application name -->
-    <meta property="og:title" content="Lovable App" />
+    <meta property="og:title" content="Lisa Schnabel" id="meta-og-title" />
     <meta property="og:description" content="Lovable Generated Project" />
     <meta property="og:type" content="website" />
-    <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    <meta property="og:image" content="/placeholder.svg" id="meta-og-image" />
 
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@Lovable" />
-    <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    <meta name="twitter:site" content="@LisaSchnabel" />
+    <meta name="twitter:image" content="/placeholder.svg" id="meta-twitter-image" />
+
+    <!-- Inline script: update title and preview image at runtime to use the configured hero image -->
+    <script>
+      (async function(){
+        try{
+          // Set static titles
+          var title = 'Lisa Schnabel';
+          document.title = title;
+          var ogTitle = document.getElementById('meta-og-title');
+          if(ogTitle) ogTitle.setAttribute('content', title);
+
+          // Fetch settings to find hero image id
+          const s = await fetch('/api/settings');
+          if(!s.ok) return;
+          const settings = await s.json();
+          const heroId = settings?.hero_image_id;
+          if(!heroId) return;
+
+          // Fetch the hero image record
+          const imgRes = await fetch(`/api/images/${heroId}`);
+          if(!imgRes.ok) return;
+          const img = await imgRes.json();
+          // Compute image URL similar to frontend transform
+          var url = img.image_path || img.url;
+          if(url && !url.startsWith('/api/images/')) url = `/api/images/${url}`;
+
+          if(url){
+            var og = document.getElementById('meta-og-image');
+            if(og) og.setAttribute('content', url);
+            var tw = document.getElementById('meta-twitter-image');
+            if(tw) tw.setAttribute('content', url);
+          }
+        }catch(e){
+          // fail silently
+          console.warn('Could not set dynamic preview image', e);
+        }
+      })();
+    </script>
   </head>
 
   <body>
