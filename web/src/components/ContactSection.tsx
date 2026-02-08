@@ -2,13 +2,14 @@ import { motion } from "framer-motion";
 import { Instagram, Twitter, Mail } from "lucide-react";
 
 export default function ContactSection() {
-  const email = import.meta.env.VITE_CONTACT_EMAIL;
+  const email = import.meta.env.VITE_CONTACT_EMAIL || "hello@example.com";
   const instagramUrl = import.meta.env.VITE_INSTAGRAM_URL;
   const twitterUrl = import.meta.env.VITE_TWITTER_URL;
 
   // Filter out invalid URLs (empty, undefined, or "#")
   const hasInstagram = instagramUrl && instagramUrl !== "#" && instagramUrl.trim() !== "";
   const hasTwitter = twitterUrl && twitterUrl !== "#" && twitterUrl.trim() !== "";
+  const hasEmail = email && email !== "hello@example.com";
 
   return (
     <section id="contact" className="py-20 bg-background">
