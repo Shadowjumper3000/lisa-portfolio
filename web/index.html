@@ -8,15 +8,28 @@
     <meta name="description" content="Lisa Schnabel - Artist Portfolio" />
     <meta name="author" content="Lisa Schnabel" />
 
-    <!-- TODO: Update og:title to match your application name -->
-    <meta property="og:title" content="Lisa Schnabel" id="meta-og-title" />
-    <meta property="og:description" content="Lisa Schnabel - Artist Portfolio" />
-    <meta property="og:type" content="website" />
-    <meta property="og:image" content="/placeholder.svg" id="meta-og-image" />
+    <!-- Canonical URL for SEO -->
+    <link rel="canonical" href="https://lisa-schnabel.com/" />
 
+
+    <!-- Open Graph for social sharing -->
+    <meta property="og:title" content="Lisa Schnabel" id="meta-og-title" />
+    <meta property="og:description" content="Contemporary artist Lisa Schnabel's official portfolio. Explore her latest works, exhibitions, and contact information." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://lisa-schnabel.com/" />
+    <meta property="og:site_name" content="Lisa Schnabel Portfolio" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:image" content="/placeholder.svg" id="meta-og-image" />
+    <meta property="og:image:alt" content="Lisa Schnabel artwork preview" />
+
+
+    <!-- Twitter Card for social sharing -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@LisaSchnabel" />
+    <meta name="twitter:title" content="Lisa Schnabel" />
+    <meta name="twitter:description" content="Contemporary artist Lisa Schnabel's official portfolio. Explore her latest works, exhibitions, and contact information." />
     <meta name="twitter:image" content="/placeholder.svg" id="meta-twitter-image" />
+    <meta name="twitter:image:alt" content="Lisa Schnabel artwork preview" />
 
     <!-- Inline script: update title and preview image at runtime to use the configured hero image -->
     <script>
@@ -42,6 +55,11 @@
           // Compute image URL similar to frontend transform
           var url = img.image_path || img.url;
           if(url && !url.startsWith('/api/images/')) url = `/api/images/${url}`;
+
+          // Make image URL absolute for social previews
+          if(url && !url.startsWith('http')) {
+            url = 'https://lisa-schnabel.com' + url;
+          }
 
           if(url){
             var og = document.getElementById('meta-og-image');
