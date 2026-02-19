@@ -6,7 +6,8 @@ services:
       file: docker-compose.yml
       service: db
     volumes:
-      - db_data:/var/lib/postgresql/data
+      # Persist Postgres data in the project `data/db` directory (host bind)
+      - ../data/db:/var/lib/postgresql/data
       - ../db/init/init.sql:/docker-entrypoint-initdb.d/init.sql
     expose:
       - 5432
@@ -19,6 +20,9 @@ services:
     expose:
       - 9000
       - 9001
+    # Persist MinIO data (object storage) in the project `data/minio` directory
+    volumes:
+      - ../data/minio:/data
     restart: unless-stopped
 
   app:
@@ -52,11 +56,8 @@ services:
       - proxy
     restart: unless-stopped
 
-volumes:
-  db_data:
-    name: portfolio-lisa-db-data
-  minio_data:
-    name: portfolio-lisa-minio-data
+# Using host bind mounts for production data directories (see above)
+# Named Docker volumes removed to ensure data is stored under project `data/`.
 
 networks:
   default:
