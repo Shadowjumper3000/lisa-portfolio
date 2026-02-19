@@ -11,4 +11,6 @@ User-agent: facebookexternalhit
 Allow: /
 
 User-agent: *
+# Allow crawling of the public site but disallow admin dashboard
 Allow: /
+Disallow: /admin

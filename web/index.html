@@ -11,6 +11,21 @@
     <!-- Canonical URL for SEO -->
     <link rel="canonical" href="https://lisa-schnabel.com/" />
 
+    <!-- Prevent indexing of admin routes (SPA) -->
+    <script>
+      (function(){
+        try{
+          var p = location.pathname || '/';
+          if(p.startsWith('/admin')){
+            var m = document.createElement('meta');
+            m.name = 'robots';
+            m.content = 'noindex, nofollow';
+            document.getElementsByTagName('head')[0].appendChild(m);
+          }
+        }catch(e){/* noop */}
+      })();
+    </script>
+
 
     <!-- Open Graph for social sharing -->
     <meta property="og:title" content="Lisa Schnabel" id="meta-og-title" />
@@ -34,6 +49,21 @@
     <!-- Inline script: update title and preview image at runtime to use the configured hero image -->
     <script>
       (async function(){
+        // Add basic JSON-LD structured data for the site
+        try{
+          var ld = document.createElement('script');
+          ld.type = 'application/ld+json';
+          ld.text = JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "Person",
+            "name": "Lisa Schnabel",
+            "url": "https://lisa-schnabel.com/",
+            "sameAs": ["https://instagram.com/","https://twitter.com/"],
+            "description": "Contemporary artist Lisa Schnabel's official portfolio. Explore her latest works, exhibitions, and contact information."
+          });
+          document.getElementsByTagName('head')[0].appendChild(ld);
+        }catch(e){}
+
         try{
           // Set static titles
           var title = 'Lisa Schnabel';
@@ -66,6 +96,15 @@
             if(og) og.setAttribute('content', url);
             var tw = document.getElementById('meta-twitter-image');
             if(tw) tw.setAttribute('content', url);
+            // Also update JSON-LD image if present (append image property)
+            try{
+              var scripts = document.querySelectorAll('script[type="application/ld+json"]');
+              if(scripts && scripts.length){
+                var obj = JSON.parse(scripts[scripts.length-1].text || '{}');
+                obj.image = url;
+                scripts[scripts.length-1].text = JSON.stringify(obj);
+              }
+            }catch(e){}
           }
         }catch(e){
           // fail silently
