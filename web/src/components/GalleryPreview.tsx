@@ -49,7 +49,7 @@ export default function GalleryPreview() {
           <h2 className="text-3xl md:text-4xl font-serif font-bold text-foreground">
             Recent Work
           </h2>
-          <p className="mt-2 text-muted-foreground">Explore my latest works or all of them</p>
+          <p className="mt-2 text-muted-foreground">Explore my latest works.</p>
         </motion.div>
       </div>
 

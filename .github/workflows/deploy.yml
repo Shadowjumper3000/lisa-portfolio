@@ -36,7 +36,7 @@ jobs:
               git checkout prod
             fi
             
-            # Create .env file with secrets
+            # Create .env file with secrets (prefer repo secrets, fall back to repo vars)
             cat > "$DEPLOY_DIR/.env" << 'ENVEOF'
           DB_HOST=db
           DB_PORT=5432
@@ -53,9 +53,9 @@ jobs:
           ADMIN_USERNAME=${{ secrets.ADMIN_USERNAME }}
           ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
           VITE_API_BASE=${{ secrets.VITE_API_BASE }}
-          VITE_CONTACT_EMAIL=${{ vars.VITE_CONTACT_EMAIL }}
-          VITE_INSTAGRAM_URL=${{ vars.VITE_INSTAGRAM_URL }}
-          VITE_TWITTER_URL=${{ vars.VITE_TWITTER_URL }}
+          VITE_CONTACT_EMAIL=${{ secrets.VITE_CONTACT_EMAIL || vars.VITE_CONTACT_EMAIL }}
+          VITE_INSTAGRAM_URL=${{ secrets.VITE_INSTAGRAM_URL || vars.VITE_INSTAGRAM_URL }}
+          VITE_TWITTER_URL=${{ secrets.VITE_TWITTER_URL || vars.VITE_TWITTER_URL }}
           SERVER_NAME=${{ secrets.SERVER_NAME }}
           ENVEOF
             
@@ -64,27 +64,27 @@ jobs:
             
             # Deploy with Docker Compose
             cd "$DEPLOY_DIR/deploy"
-            docker compose -p portfolio-lisa -f docker-compose.prod.yml down --remove-orphans || true
-            docker compose -p portfolio-lisa -f docker-compose.prod.yml up -d --build --remove-orphans
+            docker compose -p portfolio-lisa -f docker-compose.prod.yml --env-file "$DEPLOY_DIR/.env" down --remove-orphans || true
+            docker compose -p portfolio-lisa -f docker-compose.prod.yml --env-file "$DEPLOY_DIR/.env" up -d --build --remove-orphans
             
             # Wait for services to start
             sleep 15
             
             # Ensure database user exists and seed admin user
             # First, create the user if it doesn't exist (connect as postgres superuser)
-            docker compose -p portfolio-lisa -f docker-compose.prod.yml exec -T db psql -U postgres -d postgres -c "CREATE USER ${{ secrets.DB_USER }} WITH PASSWORD '${{ secrets.DB_PASSWORD }}' CREATEDB;" || true
-            docker compose -p portfolio-lisa -f docker-compose.prod.yml exec -T db psql -U postgres -d postgres -c "GRANT ALL PRIVILEGES ON DATABASE ${{ secrets.DB_NAME }} TO ${{ secrets.DB_USER }};" || true
+            docker compose -p portfolio-lisa -f docker-compose.prod.yml --env-file "$DEPLOY_DIR/.env" exec -T db psql -U postgres -d postgres -c "CREATE USER ${{ secrets.DB_USER }} WITH PASSWORD '${{ secrets.DB_PASSWORD }}' CREATEDB;" || true
+            docker compose -p portfolio-lisa -f docker-compose.prod.yml --env-file "$DEPLOY_DIR/.env" exec -T db psql -U postgres -d postgres -c "GRANT ALL PRIVILEGES ON DATABASE ${{ secrets.DB_NAME }} TO ${{ secrets.DB_USER }};" || true
             
             # Now run migrations through the app (migrations will run automatically on app startup)
             echo "✅ Database user ensured, migrations will run on app startup"
             
             # Verify deployment
-            if docker compose -p portfolio-lisa -f docker-compose.prod.yml ps | grep -q "Up"; then
+            if docker compose -p portfolio-lisa -f docker-compose.prod.yml --env-file "$DEPLOY_DIR/.env" ps | grep -q "Up"; then
               echo "✅ Deployment successful"
-              docker compose -p portfolio-lisa -f docker-compose.prod.yml ps
+              docker compose -p portfolio-lisa -f docker-compose.prod.yml --env-file "$DEPLOY_DIR/.env" ps
             else
               echo "❌ Deployment failed"
-              docker compose -p portfolio-lisa -f docker-compose.prod.yml logs --tail=50
+              docker compose -p portfolio-lisa -f docker-compose.prod.yml --env-file "$DEPLOY_DIR/.env" logs --tail=50
               exit 1
             fi
             
