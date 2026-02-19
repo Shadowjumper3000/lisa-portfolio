@@ -27,7 +27,7 @@ export default function HeroSection({ backgroundUrl }: HeroSectionProps) {
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif font-bold text-foreground leading-tight drop-shadow-lg">
             Lisa<br />Schnabel
           </h1>
-          <p className="mt-6 text-base md:text-lg text-slate-900 md:text-foreground font-light leading-relaxed drop-shadow-md">
+          <p className="mt-6 text-base md:text-lg text-slate-900 md:text-foreground font-medium leading-relaxed drop-shadow-md">
             Dream Imagery and Abstraction <br />in Oil and Acrylic.
           </p>
         </motion.div>
