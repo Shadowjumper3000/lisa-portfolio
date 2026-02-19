@@ -3,11 +3,24 @@ import { Instagram, Twitter, Mail } from "lucide-react";
 
 export default function ContactSection() {
   const email = import.meta.env.VITE_CONTACT_EMAIL || "hello@example.com";
-  const instagramUrl = import.meta.env.VITE_INSTAGRAM_URL;
+  const rawInstagram = (import.meta.env.VITE_INSTAGRAM_URL || "").trim();
   const twitterUrl = import.meta.env.VITE_TWITTER_URL;
 
-  // Filter out invalid URLs (empty, undefined, or "#")
-  const hasInstagram = instagramUrl && instagramUrl !== "#" && instagramUrl.trim() !== "";
+  // Build instagram href: accept either a full URL or a username (with or without @)
+  let instagramHref = "";
+  if (rawInstagram && rawInstagram !== "#") {
+    const maybe = rawInstagram.toLowerCase();
+    const looksLikeUrl = maybe.startsWith("http://") || maybe.startsWith("https://") || maybe.includes("instagram.com");
+    if (looksLikeUrl) {
+      instagramHref = rawInstagram;
+    } else {
+      let username = rawInstagram;
+      if (username.startsWith("@")) username = username.slice(1);
+      instagramHref = `https://instagram.com/${encodeURIComponent(username)}`;
+    }
+  }
+
+  const hasInstagram = instagramHref !== "";
   const hasTwitter = twitterUrl && twitterUrl !== "#" && twitterUrl.trim() !== "";
   const hasEmail = email && email !== "hello@example.com";
 
@@ -38,7 +51,7 @@ export default function ContactSection() {
           </a>
           <div className="flex justify-center gap-6">
             {hasInstagram && (
-              <a href={instagramUrl} className="text-muted-foreground hover:text-primary transition-colors">
+              <a href={instagramHref} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors">
                 <Instagram className="h-5 w-5" />
               </a>
             )}
