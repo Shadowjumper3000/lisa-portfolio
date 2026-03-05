@@ -62,7 +62,7 @@ func (s *Server) LoginHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) ListGalleryItems(w http.ResponseWriter, r *http.Request) {
-    rows, err := s.DB.Query("select id, title, info, description, image_path, year_created, created_at from gallery_items order by created_at desc")
+    rows, err := s.DB.Query("select id, title, info, description, image_path, year_created, sort_order, created_at from gallery_items order by sort_order asc, created_at asc")
     if err != nil {
         http.Error(w, "db error", http.StatusInternalServerError)
         return
@@ -72,7 +72,7 @@ func (s *Server) ListGalleryItems(w http.ResponseWriter, r *http.Request) {
     var out []GalleryItem
     for rows.Next() {
         var p GalleryItem
-        if err := rows.Scan(&p.ID, &p.Title, &p.Info, &p.Description, &p.ImagePath, &p.YearCreated, &p.CreatedAt); err != nil {
+        if err := rows.Scan(&p.ID, &p.Title, &p.Info, &p.Description, &p.ImagePath, &p.YearCreated, &p.SortOrder, &p.CreatedAt); err != nil {
             http.Error(w, "scan error", http.StatusInternalServerError)
             return
         }
@@ -174,10 +174,14 @@ func (s *Server) CreateGalleryItem(w http.ResponseWriter, r *http.Request) {
         imagePath = fmt.Sprintf("%s/%s", bucketName, filename)
     }
 
+    // Determine next sort_order (max + 1)
+    var maxSortOrder int
+    _ = s.DB.QueryRow("select coalesce(max(sort_order), -1) from gallery_items").Scan(&maxSortOrder)
+
     var p GalleryItem
     err = s.DB.QueryRow(
-        "insert into gallery_items (title, info, description, image_path, year_created, created_at) values ($1,$2,$3,$4,$5,$6) returning id, created_at",
-        title, info, description, imagePath, yearCreated, time.Now()).Scan(&p.ID, &p.CreatedAt)
+        "insert into gallery_items (title, info, description, image_path, year_created, sort_order, created_at) values ($1,$2,$3,$4,$5,$6,$7) returning id, sort_order, created_at",
+        title, info, description, imagePath, yearCreated, maxSortOrder+1, time.Now()).Scan(&p.ID, &p.SortOrder, &p.CreatedAt)
     if err != nil {
         log.Printf("DB insert error: %v", err)
         http.Error(w, "db error", http.StatusInternalServerError)
@@ -542,8 +546,8 @@ func (s *Server) GetGalleryItemByID(w http.ResponseWriter, r *http.Request) {
 
     var p GalleryItem
     err = s.DB.QueryRow(
-        "select id, title, info, description, image_path, year_created, created_at from gallery_items where id=$1",
-        id).Scan(&p.ID, &p.Title, &p.Info, &p.Description, &p.ImagePath, &p.YearCreated, &p.CreatedAt)
+        "select id, title, info, description, image_path, year_created, sort_order, created_at from gallery_items where id=$1",
+        id).Scan(&p.ID, &p.Title, &p.Info, &p.Description, &p.ImagePath, &p.YearCreated, &p.SortOrder, &p.CreatedAt)
     
     if err != nil {
         if err == sql.ErrNoRows {
@@ -583,8 +587,8 @@ func (s *Server) UpdateGalleryItemJSON(w http.ResponseWriter, r *http.Request) {
     // Get existing item to preserve other fields
     var p GalleryItem
     err = s.DB.QueryRow(
-        "select id, title, info, description, image_path, year_created, created_at from gallery_items where id=$1",
-        id).Scan(&p.ID, &p.Title, &p.Info, &p.Description, &p.ImagePath, &p.YearCreated, &p.CreatedAt)
+        "select id, title, info, description, image_path, year_created, sort_order, created_at from gallery_items where id=$1",
+        id).Scan(&p.ID, &p.Title, &p.Info, &p.Description, &p.ImagePath, &p.YearCreated, &p.SortOrder, &p.CreatedAt)
     
     if err != nil {
         if err == sql.ErrNoRows {
@@ -620,6 +624,48 @@ func (s *Server) UpdateGalleryItemJSON(w http.ResponseWriter, r *http.Request) {
 
     w.Header().Set("Content-Type", "application/json")
     json.NewEncoder(w).Encode(p)
+}
+
+// ReorderGalleryItems accepts [{id, sort_order},...] and bulk-updates sort_order
+func (s *Server) ReorderGalleryItems(w http.ResponseWriter, r *http.Request) {
+    var items []struct {
+        ID        int `json:"id"`
+        SortOrder int `json:"sort_order"`
+    }
+    if err := json.NewDecoder(r.Body).Decode(&items); err != nil {
+        http.Error(w, "bad request", http.StatusBadRequest)
+        return
+    }
+
+    tx, err := s.DB.Begin()
+    if err != nil {
+        http.Error(w, "db error", http.StatusInternalServerError)
+        return
+    }
+    defer tx.Rollback()
+
+    stmt, err := tx.Prepare("update gallery_items set sort_order=$1 where id=$2")
+    if err != nil {
+        http.Error(w, "db error", http.StatusInternalServerError)
+        return
+    }
+    defer stmt.Close()
+
+    for _, item := range items {
+        if _, err := stmt.Exec(item.SortOrder, item.ID); err != nil {
+            log.Printf("DB reorder error: %v", err)
+            http.Error(w, "db error", http.StatusInternalServerError)
+            return
+        }
+    }
+
+    if err := tx.Commit(); err != nil {
+        http.Error(w, "db error", http.StatusInternalServerError)
+        return
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
 type SiteSettings struct {

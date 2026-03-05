@@ -143,6 +143,7 @@ func main() {
     
     // Images endpoints
     r.HandleFunc("/api/images", srv.ListGalleryItems).Methods("GET", "OPTIONS")
+    r.HandleFunc("/api/images/reorder", srv.AuthMiddleware(srv.ReorderGalleryItems)).Methods("PUT", "OPTIONS")
     r.HandleFunc("/api/images/{id}", srv.GetGalleryItemByID).Methods("GET", "OPTIONS")
     r.HandleFunc("/api/images", srv.AuthMiddleware(srv.CreateGalleryItem)).Methods("POST", "OPTIONS")
     r.HandleFunc("/api/images/{id}", srv.AuthMiddleware(srv.UpdateGalleryItemJSON)).Methods("PUT", "OPTIONS")

@@ -27,6 +27,7 @@ export interface Image {
   info?: string;
   yearCreated?: number;
   image_path: string;
+  sort_order: number;
   created_at: string;
   // Computed/transformed fields for frontend
   url?: string;
@@ -59,6 +60,7 @@ function transformImage(img: any): Image {
   return {
     ...img,
     url,
+    sort_order: img.sort_order ?? 0,
     category: img.info,
   };
 }
@@ -118,6 +120,13 @@ export const updateImage = (id: string, data: Partial<Pick<Image, "title" | "des
 
 export const deleteImage = (id: string) =>
   request<{ success: boolean }>(`/images/${id}`, { method: "DELETE" });
+
+export const reorderImages = (items: { id: number; sort_order: number }[]) =>
+  request<{ status: string }>("/images/reorder", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(items),
+  });
 
 export const updateSettings = (data: SiteSettings) =>
   request<SiteSettings>("/settings", {
