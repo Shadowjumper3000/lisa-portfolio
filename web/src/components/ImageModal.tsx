@@ -35,7 +35,12 @@ export default function ImageModal({ imageId, onClose }: ImageModalProps) {
               />
             </div>
             <div className="p-6 bg-white">
-              <h3 className="text-xl font-serif font-bold text-foreground">{image.title}</h3>
+              <div className="flex items-baseline space-x-3">
+                <h3 className="text-xl font-serif font-bold text-foreground">{image.title}</h3>
+                {image.yearCreated ? (
+                  <span className="text-sm text-muted-foreground">{image.yearCreated}</span>
+                ) : null}
+              </div>
               {image.description && (
                 <p className="mt-2 text-muted-foreground">{image.description}</p>
               )}
