@@ -17,22 +17,24 @@ export default function ImageModal({ imageId, onClose }: ImageModalProps) {
 
   return (
     <Dialog open={!!imageId} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-4xl w-[95vw] p-0 overflow-hidden bg-card">
+      <DialogContent className="max-w-4xl w-[95vw] p-0 overflow-hidden bg-white rounded-lg shadow-lg">
         {isLoading ? (
-          <div className="p-8 space-y-4">
+          <div className="p-8 space-y-4 bg-white">
             <Skeleton className="w-full aspect-[3/2] rounded-none" />
             <Skeleton className="h-6 w-1/2" />
             <Skeleton className="h-4 w-3/4" />
           </div>
         ) : image ? (
-          <>
-            <img
-              src={image.url}
-              alt={image.title}
-              className="w-full max-h-[60vh] object-contain bg-foreground/5"
-              onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.svg"; }}
-            />
-            <div className="p-6">
+          <div className="flex flex-col bg-white">
+            <div className="flex items-center justify-center p-6">
+              <img
+                src={image.url}
+                alt={image.title}
+                className="max-h-[70vh] max-w-full object-contain"
+                onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.svg"; }}
+              />
+            </div>
+            <div className="p-6 bg-white">
               <h3 className="text-xl font-serif font-bold text-foreground">{image.title}</h3>
               {image.description && (
                 <p className="mt-2 text-muted-foreground">{image.description}</p>
@@ -43,7 +45,7 @@ export default function ImageModal({ imageId, onClose }: ImageModalProps) {
                 </div>
               )}
             </div>
-          </>
+          </div>
         ) : null}
       </DialogContent>
     </Dialog>
