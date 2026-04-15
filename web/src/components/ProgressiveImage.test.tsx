@@ -17,7 +17,10 @@ describe("ProgressiveImage", () => {
 
     const image = screen.getByAltText("Missing artwork") as HTMLImageElement;
     fireEvent.error(image);
-
     expect(image.src).toContain("/placeholder.svg");
+
+    fireEvent.load(image);
+
+    expect(image).toHaveClass("opacity-100");
   });
 });

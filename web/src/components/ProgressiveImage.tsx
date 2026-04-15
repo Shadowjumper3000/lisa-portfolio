@@ -30,7 +30,7 @@ export function ProgressiveImage({
       <img
         src={PLACEHOLDER_SRC}
         alt=""
-        aria-hidden
+        aria-hidden="true"
         className={cn(
           "absolute inset-0 h-full w-full object-cover scale-105 blur-xl transition-opacity duration-500",
           isLoaded ? "opacity-0" : "opacity-100",
@@ -49,7 +49,8 @@ export function ProgressiveImage({
         onLoad={() => setIsLoaded(true)}
         onError={(e) => {
           const target = e.currentTarget;
-          if (target.src.endsWith(PLACEHOLDER_SRC)) {
+          const isPlaceholder = target.src.includes(PLACEHOLDER_SRC);
+          if (isPlaceholder) {
             setIsLoaded(true);
             return;
           }
@@ -82,7 +83,7 @@ export function ProgressiveBackground({
     setDisplaySrc(safeSrc);
     setIsLoaded(false);
 
-    const image = new window.Image();
+    const image = new Image();
     image.onload = () => {
       if (isActive) setIsLoaded(true);
     };
@@ -101,7 +102,7 @@ export function ProgressiveBackground({
   return (
     <div className={cn("relative overflow-hidden", containerClassName)}>
       <div
-        aria-hidden
+        aria-hidden="true"
         className={cn(
           "absolute inset-0 bg-cover bg-center bg-no-repeat scale-105 blur-xl transition-opacity duration-500",
           isLoaded ? "opacity-0" : "opacity-100",
@@ -110,7 +111,7 @@ export function ProgressiveBackground({
         style={{ backgroundImage: `url(${PLACEHOLDER_SRC})` }}
       />
       <div
-        aria-hidden
+        aria-hidden="true"
         className={cn(
           "absolute inset-0 bg-cover bg-center bg-no-repeat transition-all duration-500",
           isLoaded ? "opacity-100 blur-0" : "opacity-0 blur-xl",
