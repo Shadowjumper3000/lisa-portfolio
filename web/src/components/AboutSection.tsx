@@ -1,24 +1,25 @@
 import { motion } from "framer-motion";
+import { ProgressiveBackground } from "@/components/ProgressiveImage";
 
 interface AboutSectionProps {
   backgroundUrl: string | null;
 }
 
 export default function AboutSection({ backgroundUrl }: AboutSectionProps) {
-  const bg = backgroundUrl || "/placeholder.svg";
-
   return (
     <section className="relative min-h-screen w-full overflow-hidden flex">
       {/* Mobile: Background image with overlay */}
-      <div
-        className="absolute inset-0 md:hidden bg-cover bg-center"
-        style={{ backgroundImage: `url(${bg})` }}
+      <ProgressiveBackground
+        src={backgroundUrl}
+        containerClassName="absolute inset-0 md:hidden"
+        imageClassName="bg-cover bg-center"
       />
       
       {/* Fixed parallax background - positioned on left 2/3 */}
-      <div
-        className="hidden md:flex md:w-2/3 bg-secondary/50 bg-contain bg-center bg-no-repeat items-center justify-center"
-        style={{ backgroundImage: `url(${bg})` }}
+      <ProgressiveBackground
+        src={backgroundUrl}
+        containerClassName="hidden md:flex md:w-2/3 bg-secondary/50 items-center justify-center"
+        imageClassName="bg-contain bg-center bg-no-repeat"
       />
 
       {/* Right 1/3 overlay with bright background - mobile has semi-transparent overlay */}
