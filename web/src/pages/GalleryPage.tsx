@@ -6,6 +6,7 @@ import ImageModal from "@/components/ImageModal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
+import { ProgressiveImage } from "@/components/ProgressiveImage";
 
 const PAGE_SIZE = 12;
 
@@ -83,12 +84,10 @@ export default function GalleryPage() {
                       onClick={() => setSelectedId(img.id)}
                       className="group relative overflow-hidden rounded-lg aspect-[4/3] bg-muted w-full"
                     >
-                      <img
+                      <ProgressiveImage
                         src={img.url}
                         alt={img.title}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                        loading="lazy"
-                        onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.svg"; }}
+                        className="group-hover:scale-105"
                       />
                     </button>
                     <p className="mt-2 text-sm font-medium text-foreground">{img.title}</p>
