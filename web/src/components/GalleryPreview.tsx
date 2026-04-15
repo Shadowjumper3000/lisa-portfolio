@@ -7,6 +7,7 @@ import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import ImageModal from "@/components/ImageModal";
+import { ProgressiveImage } from "@/components/ProgressiveImage";
 
 export default function GalleryPreview() {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -78,12 +79,10 @@ export default function GalleryPreview() {
                 className="flex-1 min-w-[280px] md:min-w-0 shrink-0 snap-center group text-left"
               >
                 <div className="relative overflow-hidden rounded-lg aspect-[4/3] bg-muted cursor-pointer">
-                  <img
+                  <ProgressiveImage
                     src={img.url}
                     alt={img.title}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                    loading="lazy"
-                    onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.svg"; }}
+                    className="group-hover:scale-110"
                   />
                 </div>
                 <p className="mt-2 text-sm font-medium text-foreground">{img.title}</p>
