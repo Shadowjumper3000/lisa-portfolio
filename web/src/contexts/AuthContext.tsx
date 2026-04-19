@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
-
-const AUTH_EXPIRED_EVENT = "auth-expired";
+import { AUTH_EXPIRED_EVENT } from "@/lib/auth-events";
 
 interface AuthContextType {
   token: string | null;

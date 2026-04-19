@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { fetchImages } from "./api";
+import { AUTH_EXPIRED_EVENT } from "./auth-events";
 
 describe("api auth expiry handling", () => {
   afterEach(() => {
@@ -20,6 +21,6 @@ describe("api auth expiry handling", () => {
 
     await expect(fetchImages()).rejects.toThrow("unauthorized");
     expect(localStorage.getItem("auth_token")).toBeNull();
-    expect(eventSpy).toHaveBeenCalledWith(expect.objectContaining({ type: "auth-expired" }));
+    expect(eventSpy).toHaveBeenCalledWith(expect.objectContaining({ type: AUTH_EXPIRED_EVENT }));
   });
 });
