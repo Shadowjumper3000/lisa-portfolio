@@ -1,4 +1,17 @@
+import { AUTH_EXPIRED_EVENT } from "@/lib/auth-events";
+
 const API_BASE = "/api";
+
+function handleUnauthorizedResponse() {
+  localStorage.removeItem("auth_token");
+  window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
+}
+
+function handleUnauthorizedStatus(status: number) {
+  if (status === 401) {
+    handleUnauthorizedResponse();
+  }
+}
 
 function getAuthHeaders(): HeadersInit {
   const token = localStorage.getItem("auth_token");
@@ -15,6 +28,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   });
   if (!res.ok) {
     const error = await res.json().catch(() => ({ message: res.statusText }));
+    handleUnauthorizedStatus(res.status);
     throw new Error(error.message || `Request failed: ${res.status}`);
   }
   return res.json();
@@ -103,6 +117,7 @@ export const uploadImage = (formData: FormData, onProgress?: (pct: number) => vo
         const img = JSON.parse(xhr.responseText);
         resolve(transformImage(img));
       } else {
+        handleUnauthorizedStatus(xhr.status);
         reject(new Error(`Upload failed: ${xhr.status}`));
       }
     };
@@ -134,4 +149,3 @@ export const updateSettings = (data: SiteSettings) =>
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
-
