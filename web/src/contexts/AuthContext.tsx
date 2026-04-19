@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 
+const AUTH_EXPIRED_EVENT = "auth-expired";
+
 interface AuthContextType {
   token: string | null;
   isAuthenticated: boolean;
@@ -26,6 +28,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const handler = () => setTokenState(localStorage.getItem("auth_token"));
     window.addEventListener("storage", handler);
     return () => window.removeEventListener("storage", handler);
+  }, []);
+
+  useEffect(() => {
+    const handler = () => setTokenState(null);
+    window.addEventListener(AUTH_EXPIRED_EVENT, handler);
+    return () => window.removeEventListener(AUTH_EXPIRED_EVENT, handler);
   }, []);
 
   return (
