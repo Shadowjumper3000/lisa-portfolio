@@ -104,7 +104,8 @@ func main() {
     // Initialize MinIO client
     endpoint := os.Getenv("MINIO_ENDPOINT")
     if endpoint == "" {
-        endpoint = "minio:9000"
+        // MinIO is a sibling process on loopback, not a separate container.
+        endpoint = "127.0.0.1:9000"
     }
     accessKey := os.Getenv("MINIO_ACCESS_KEY")
     if accessKey == "" {
@@ -169,7 +170,13 @@ func main() {
         json.NewEncoder(w).Encode(map[string]string{"status":"ok","server":serverName})
     }).Methods("GET")
 
-    addr := ":8080"
+    // In the all-in-one container the API is fronted by nginx (or Vite in dev)
+    // on loopback, so APP_ADDR pins it to 127.0.0.1 and it is never reachable
+    // from outside the container. Defaults to the old ":8080" when unset.
+    addr := os.Getenv("APP_ADDR")
+    if addr == "" {
+        addr = ":8080"
+    }
     log.Printf("listening %s (server=%s)", addr, os.Getenv("SERVER_NAME"))
     log.Fatal(http.ListenAndServe(addr, r))
 }

@@ -1,63 +1,69 @@
 name: portfolio-lisa
 
+# Base definition shared by the dev and prod overlays.
+#
+# The whole stack (Postgres, MinIO, the Go API and the web tier) lives in a
+# single container supervised by supervisord. Nothing runs as root: every
+# process is uid/gid 999, which is the uid that already owns the live cluster in
+# data/db, so the existing database attaches without a chown.
+
 services:
-  db:
-    image: portfolio-lisa-db:${VERSION_DB:-latest}
+  portfolio:
+    image: portfolio-lisa:${VERSION:-latest}
+    container_name: portfolio-lisa
     build:
-      context: .
-      dockerfile_inline: |
-        FROM postgres:15
-    container_name: portfolio-lisa-db
+      context: ..
+      dockerfile: deploy/Dockerfile
+
     environment:
+      # --- Postgres bootstrap ---
+      # Only consulted the first time the data volume is initialised. The live
+      # volume is already initialised, so these must MATCH the credentials the
+      # cluster was created with or the API will fail to authenticate.
       POSTGRES_USER: ${DB_USER:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
       POSTGRES_DB: ${DB_NAME:-portfolio}
+
+      # --- Go API ---
+      # DB_HOST/DB_PORT/APP_ADDR/MINIO_ENDPOINT are baked into the image; every
+      # hop is loopback now that the services share a network namespace.
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_NAME: ${DB_NAME:-portfolio}
+      JWT_SECRET: ${JWT_SECRET:-dev-only-insecure-secret}
+      SERVER_NAME: ${SERVER_NAME:-_}
+
+      # --- first-init admin seed ---
+      # Consumed by db/init/01-init.sh on a first-time initdb only. The dev
+      # defaults are deliberately obvious; staging and production both override
+      # these with `:?` so a missing secret fails the deploy.
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-password}
+
+      # --- MinIO ---
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+
+    # Hardening. The image already drops to uid 999; these stop the container
+    # from regaining privilege even if something inside it is compromised.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+    # Docker's default 10s grace period would SIGKILL Postgres mid-shutdown and
+    # force crash recovery on every restart. supervisord gives Postgres up to
+    # 60s for a fast shutdown, so the container needs more headroom than that.
+    stop_grace_period: 90s
+
+    # NOTE: the Postgres and MinIO data mounts are deliberately NOT declared
+    # here. `extends` merges volume lists, so a data mount in this file would be
+    # silently combined with the overlay's mount at the same target. Dev uses
+    # named volumes, prod uses host bind mounts — each declares its own.
     volumes:
-      - db_data:/var/lib/postgresql/data
-    
-
-  minio:
-    image: minio/minio:latest
-    container_name: portfolio-lisa-minio
-    command: server /data --console-address ":9001"
-    environment:
-      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minioadmin}
-      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minioadmin}
-    volumes:
-      - minio_data:/data
-    
-
-  app:
-    image: portfolio-lisa-app:${VERSION_APP:-latest}
-    container_name: portfolio-lisa-app
-    environment:
-      - DB_HOST=${DB_HOST:-db}
-      - DB_PORT=${DB_PORT:-5432}
-      - DB_USER=${DB_USER:-postgres}
-      - DB_PASSWORD=${DB_PASSWORD:-postgres}
-      - DB_NAME=${DB_NAME:-portfolio}
-      - JWT_SECRET=${JWT_SECRET:-changemeinproduction}
-      - MINIO_ENDPOINT=${MINIO_ENDPOINT:-minio:9000}
-      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-minioadmin}
-      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minioadmin}
-      - MINIO_USE_SSL=false
-    depends_on:
-      - db
-      - minio
-    
-
-  web:
-    image: portfolio-lisa-web:${VERSION_WEB:-latest}
-    container_name: portfolio-lisa-web
-    environment:
-      - SERVER_NAME=${SERVER_NAME:-_}
-    depends_on:
-      - app
-    
-
-volumes:
-  db_data:
-    name: portfolio-lisa-db-data
-  minio_data:
-    name: portfolio-lisa-minio-data
-
+      # Seeds the admin user; Postgres only runs this on a first-time init.
+      # Seeds schema + admin user; Postgres only runs this on a first-time
+      # initdb, so production (already initialised) never executes it.
+      - ../db/init:/docker-entrypoint-initdb.d:ro
