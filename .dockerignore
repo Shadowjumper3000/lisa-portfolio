@@ -1,0 +1,25 @@
+# Build context hygiene: keep host artefacts and secrets out of the image.
+.git
+.github
+.env
+.env.*
+!.env.example
+
+# Local persistent data (never belongs in an image layer)
+data/
+
+# Node
+web/node_modules
+web/dist
+npm-debug.log*
+
+# Go
+app/bin
+app/vendor
+coverage.out
+
+# Editors / OS
+.idea
+.vscode
+.DS_Store
+*.log

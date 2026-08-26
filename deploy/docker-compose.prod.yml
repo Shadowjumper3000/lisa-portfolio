@@ -1,63 +1,56 @@
 name: portfolio-lisa
 
 services:
-  db:
+  portfolio:
     extends:
       file: docker-compose.yml
-      service: db
-    volumes:
-      # Persist Postgres data in the project `data/db` directory (host bind)
-      - ../data/db:/var/lib/postgresql/data
-      - ../db/init/init.sql:/docker-entrypoint-initdb.d/init.sql
-    expose:
-      - 5432
-    restart: unless-stopped
+      service: portfolio
 
-  minio:
-    extends:
-      file: docker-compose.yml
-      service: minio
-    expose:
-      - 9000
-      - 9001
-    # Persist MinIO data (object storage) in the project `data/minio` directory
-    volumes:
-      - ../data/minio:/data
-    restart: unless-stopped
-
-  app:
-    extends:
-      file: docker-compose.yml
-      service: app
     build:
       context: ..
-      dockerfile: deploy/Dockerfile.app
-      target: production
-    expose:
-      - 8080
-    restart: unless-stopped
-
-  web:
-    extends:
-      file: docker-compose.yml
-      service: web
-    build:
-      context: ../web
-      dockerfile: ../deploy/Dockerfile.web
+      dockerfile: deploy/Dockerfile
       target: production
       args:
         VITE_CONTACT_EMAIL: ${VITE_CONTACT_EMAIL:-hello@example.com}
         VITE_INSTAGRAM_URL: ${VITE_INSTAGRAM_URL:-#}
         VITE_TWITTER_URL: ${VITE_TWITTER_URL:-#}
-    expose:
-      - 80
-    networks:
-      - default
-      - proxy
-    restart: unless-stopped
 
-# Using host bind mounts for production data directories (see above)
-# Named Docker volumes removed to ensure data is stored under project `data/`.
+    # Production refuses to fall back to the development defaults in the base
+    # file. A missing secret fails the deploy instead of silently shipping
+    # `minioadmin` / `dev-only-insecure-secret` to the internet.
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD must be set}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD must be set}
+
+    # Host bind mounts, matching what has actually been deployed since
+    # b98d020 (2026-02-19, "improved data persistence"). This is where the live
+    # database and gallery objects are — NOT the portfolio-lisa-db-data named
+    # volume, which is a stale leftover from before that commit.
+    #
+    # Override the paths only if the data genuinely lives elsewhere; the deploy
+    # workflow refuses to start unless DB_DATA already contains an initialised
+    # cluster, so a wrong path aborts the deploy instead of silently initdb'ing
+    # an empty one and serving a blank site.
+    volumes:
+      - ${DB_DATA:-../data/db}:/var/lib/postgresql/data
+      - ${MINIO_DATA:-../data/minio}:/var/lib/minio
+
+    # nginx binds 8080, not 80 — an unprivileged process cannot take a port
+    # below 1024. The reverse proxy upstream must point at port 8080.
+    expose:
+      - 8080
+
+    networks:
+      default:
+      proxy:
+        # Keeps the old hostname working so only the port changes upstream.
+        aliases:
+          - portfolio-lisa-web
+
+    restart: unless-stopped
 
 networks:
   default:

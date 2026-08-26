@@ -1,71 +1,53 @@
 name: portfolio-lisa
 
 services:
-  db:
+  portfolio:
     extends:
       file: docker-compose.yml
-      service: db
-    volumes:
-      - ../db/init:/docker-entrypoint-initdb.d:ro
-    ports:
-      - "5432:5432"
-    
+      service: portfolio
 
-  minio:
-    extends:
-      file: docker-compose.yml
-      service: minio
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    
-
-  app:
-    extends:
-      file: docker-compose.yml
-      service: app
     build:
       context: ..
-      dockerfile: deploy/Dockerfile.app
+      dockerfile: deploy/Dockerfile
       target: development
+
+    # All published on host loopback only — these are debugging conveniences,
+    # not services that should be reachable from the network.
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"   # Vite dev server (proxies /api itself)
+      - "127.0.0.1:5432:5432"   # Postgres, for a local DB client
+      - "127.0.0.1:9000:9000"   # MinIO S3 API
+      - "127.0.0.1:9001:9001"   # MinIO console
+
+    # Source bind mounts for hot reload. Read-only: the dev server only reads
+    # them, and node_modules/build caches live inside the image where uid 999
+    # owns them.
     volumes:
+      # Dev keeps its data in named volumes (prod uses host bind mounts).
+      - db_data:/var/lib/postgresql/data
+      - minio_data:/var/lib/minio
+      - ../web/src:/usr/src/app/src:ro
+      - ../web/public:/usr/src/app/public:ro
+      - ../web/index.html:/usr/src/app/index.html:ro
+      - ../web/vite.config.ts:/usr/src/app/vite.config.ts:ro
+      - ../web/tsconfig.json:/usr/src/app/tsconfig.json:ro
+      - ../web/tsconfig.app.json:/usr/src/app/tsconfig.app.json:ro
+      - ../web/tsconfig.node.json:/usr/src/app/tsconfig.node.json:ro
+      - ../web/tailwind.config.ts:/usr/src/app/tailwind.config.ts:ro
+      - ../web/postcss.config.js:/usr/src/app/postcss.config.js:ro
+      - ../web/components.json:/usr/src/app/components.json:ro
       - ../db/migrations:/app/migrations:ro
-    restart: unless-stopped
-    
 
-  web:
-    extends:
-      file: docker-compose.yml
-      service: web
-    build:
-      context: ../web
-      dockerfile: ../deploy/Dockerfile.web
-      target: development
-    ports:
-      - "80:8080"
-    volumes:
-      - ../web/src:/usr/src/app/src
-      - ../web/public:/usr/src/app/public
-      - ../web/index.html:/usr/src/app/index.html
-      - ../web/vite.config.ts:/usr/src/app/vite.config.ts
-      - ../web/tsconfig.json:/usr/src/app/tsconfig.json
-      - ../web/tsconfig.app.json:/usr/src/app/tsconfig.app.json
-      - ../web/tsconfig.node.json:/usr/src/app/tsconfig.node.json
-      - ../web/tailwind.config.ts:/usr/src/app/tailwind.config.ts
-      - ../web/postcss.config.js:/usr/src/app/postcss.config.js
-      - ../web/components.json:/usr/src/app/components.json
     restart: unless-stopped
-    
 
+# Deliberately distinct from the production volume names, so running the dev
+# stack on a host that also runs prod cannot attach the production database.
 volumes:
   db_data:
-    name: portfolio-lisa-db-data
+    name: portfolio-lisa-dev-db-data
   minio_data:
-    name: portfolio-lisa-minio-data
+    name: portfolio-lisa-dev-minio-data
 
 networks:
   default:
     name: portfolio-lisa-internal
-  

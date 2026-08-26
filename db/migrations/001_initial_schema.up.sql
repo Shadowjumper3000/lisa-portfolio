@@ -23,7 +23,8 @@ CREATE TABLE IF NOT EXISTS site_settings (
   CONSTRAINT single_row CHECK (id = 1)
 );
 
--- Seed admin (username: admin, password: password)
-INSERT INTO admin_users (username, password)
-VALUES ('admin', 'password')
-ON CONFLICT (username) DO NOTHING;
+-- NOTE: this migration used to seed a hardcoded `admin` / `password` account.
+-- The conflict target is `username`, so on any database whose real admin was
+-- seeded under a different name that INSERT did not conflict — it created a
+-- SECOND account with a known plaintext password. The admin user is seeded by
+-- db/init/01-init.sh from ADMIN_USERNAME / ADMIN_PASSWORD instead.

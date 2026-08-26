@@ -1,0 +1,67 @@
+name: portfolio-lisa-staging
+
+# Staging runs the *production* image target — same nginx, same built SPA, same
+# Go binary. The only differences are which data it points at, what it is called
+# and which proxy alias it answers to. If staging ran the dev target it would
+# not be testing what actually ships.
+
+services:
+  portfolio:
+    extends:
+      file: docker-compose.yml
+      service: portfolio
+
+    # Distinct from production on every axis that Docker keys on. The image tag
+    # in particular MUST differ: sharing `portfolio-lisa:latest` would mean a
+    # staging build silently replaces the image production restarts from.
+    image: portfolio-lisa-staging:${VERSION:-latest}
+    container_name: portfolio-lisa-staging
+
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: production
+      args:
+        VITE_CONTACT_EMAIL: ${VITE_CONTACT_EMAIL:-hello@example.com}
+        VITE_INSTAGRAM_URL: ${VITE_INSTAGRAM_URL:-#}
+        VITE_TWITTER_URL: ${VITE_TWITTER_URL:-#}
+
+    # Same fail-fast rule as production: staging is internet-facing on its own
+    # subdomain, so it does not get to fall back to `minioadmin`.
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD must be set}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD must be set}
+      # Seeded by db/init on a first-time initdb only. Staging bootstraps from
+      # empty, so unlike production this actually runs.
+      ADMIN_USERNAME: ${ADMIN_USERNAME:?ADMIN_USERNAME must be set}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD must be set}
+
+    # Relative to this file's directory, i.e. the staging deploy directory —
+    # a different tree from production's. deploy.sh derives the directory from
+    # ENVIRONMENT alone, so these can never resolve onto the production data.
+    volumes:
+      - ${DB_DATA:-../data/db}:/var/lib/postgresql/data
+      - ${MINIO_DATA:-../data/minio}:/var/lib/minio
+
+    expose:
+      - 8080
+
+    networks:
+      default:
+      proxy:
+        aliases:
+          - portfolio-lisa-staging-web
+
+    restart: unless-stopped
+
+networks:
+  # Distinct from portfolio-lisa-internal so the two stacks cannot see each
+  # other, even though both sit on the shared external proxy network.
+  default:
+    name: portfolio-lisa-staging-internal
+  proxy:
+    external: true
+    name: proxy

@@ -2,6 +2,10 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 
+// The Go API used to be a separate `app` container; it is now a sibling
+// process on loopback inside the all-in-one container.
+const apiTarget = process.env.VITE_PROXY_TARGET || "http://127.0.0.1:8090";
+
 // https://vitejs.dev/config/
 export default defineConfig({
   server: {
@@ -13,11 +17,11 @@ export default defineConfig({
     },
     proxy: {
       '/api': {
-        target: 'http://app:8080',
+        target: apiTarget,
         changeOrigin: true,
       },
       '/health': {
-        target: 'http://app:8080',
+        target: apiTarget,
         changeOrigin: true,
       }
     }

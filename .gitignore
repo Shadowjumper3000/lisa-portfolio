@@ -4,8 +4,11 @@ build/
 .env
 .env.local
 .venv/
-bin/
-vendor/
+# Anchored: a bare `bin/` also matched deploy/rootfs/usr/local/bin, which is
+# image content that must be committed.
+/bin/
+/app/bin/
+/app/vendor/
 coverage.out
 *.log
 *.sqlite
