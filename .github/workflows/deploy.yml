@@ -1,96 +1,176 @@
-name: Deploy to Production
+name: Deploy
+
+# Deployment strategy
+# -------------------
+#   push to main   -> staging      (automatic, every merge)
+#   push tag v*    -> production   (deliberate, a release tag is the only way)
+#   workflow_dispatch -> either    (manual re-deploy; production still requires
+#                                   a tag, which is also how you roll back:
+#                                   dispatch production at the previous tag)
+#
+# The remote half lives in deploy/deploy.sh rather than inline here, so the two
+# environments share one implementation, it can be syntax-checked, and it shows
+# up as a readable diff instead of a wall of YAML-embedded shell.
 
 on:
   push:
-    branches: [prod]
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        type: choice
+        options: [staging, production]
+        default: staging
+      ref:
+        description: Branch (staging) or release tag (production). Defaults to main.
+        type: string
+        required: false
+
+permissions:
+  contents: read
 
 jobs:
-  deploy:
+  resolve:
+    name: Resolve target
     runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.t.outputs.environment }}
+      ref: ${{ steps.t.outputs.ref }}
+      ref_type: ${{ steps.t.outputs.ref_type }}
     steps:
-      - name: Setup SSH
-        uses: webfactory/ssh-agent@v0.9.0
+      - id: t
+        # Inputs come in as env rather than being interpolated into the script
+        # body: a ref name is attacker-controllable on a fork and `${{ }}` inside
+        # `run:` is textual substitution, i.e. shell injection.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          GH_REF_TYPE: ${{ github.ref_type }}
+          GH_REF_NAME: ${{ github.ref_name }}
+          IN_ENVIRONMENT: ${{ inputs.environment }}
+          IN_REF: ${{ inputs.ref }}
+        run: |
+          set -euo pipefail
+
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            ENVIRONMENT="$IN_ENVIRONMENT"
+            REF="$IN_REF"
+            if [ -z "$REF" ]; then
+              REF="main"
+            fi
+          elif [ "$GH_REF_TYPE" = "tag" ]; then
+            ENVIRONMENT="production"
+            REF="$GH_REF_NAME"
+          else
+            ENVIRONMENT="staging"
+            REF="$GH_REF_NAME"
+          fi
+
+          case "$REF" in
+            v[0-9]*) REF_TYPE="tag" ;;
+            *)       REF_TYPE="branch" ;;
+          esac
+
+          # Production is tag-only, on every trigger path. This is the rule that
+          # keeps an accidental branch push off the live site.
+          if [ "$ENVIRONMENT" = "production" ] && [ "$REF_TYPE" != "tag" ]; then
+            echo "::error::Production deploys only from a release tag (v*), got '$REF'."
+            exit 1
+          fi
+
+          {
+            echo "environment=$ENVIRONMENT"
+            echo "ref=$REF"
+            echo "ref_type=$REF_TYPE"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "### Deploying \`$REF\` ($REF_TYPE) to **$ENVIRONMENT**" >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    name: Deploy to ${{ needs.resolve.outputs.environment }}
+    needs: resolve
+    runs-on: ubuntu-latest
+    # Serialise per environment. Two staging deploys racing would fight over the
+    # same compose project; a staging deploy and a production one must not.
+    concurrency:
+      group: deploy-${{ needs.resolve.outputs.environment }}
+      cancel-in-progress: false
+    env:
+      SSH_TARGET: ${{ secrets.HETZNER_USER }}@${{ secrets.HETZNER_HOST }}
+      ENVIRONMENT: ${{ needs.resolve.outputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.ref }}
+
+      - uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.HETZNER_SSH_KEY }}
-      
-      - name: Deploy
-        run: |
-          ssh -o StrictHostKeyChecking=accept-new ${{ secrets.HETZNER_USER }}@${{ secrets.HETZNER_HOST }} << 'EOF'
-            DEPLOY_DIR="/home/${{ secrets.HETZNER_USER }}/portfolio-lisa"
-            
-            # Ensure GitHub is in known_hosts
-            mkdir -p ~/.ssh
-            ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
-            
-            # Check if directory exists and is a valid git repo
-            if [ -d "$DEPLOY_DIR/.git" ]; then
-              echo "Repository exists, updating..."
-              cd "$DEPLOY_DIR"
-              git fetch origin prod
-              git reset --hard origin/prod
-            else
-              echo "Repository not found, cloning..."
-              rm -rf "$DEPLOY_DIR"
-              git clone https://github.com/${{ github.repository }}.git "$DEPLOY_DIR"
-              cd "$DEPLOY_DIR"
-              git checkout prod
-            fi
-            
-            # Create .env file with secrets (prefer repo secrets, fall back to repo vars)
-            cat > "$DEPLOY_DIR/.env" << 'ENVEOF'
-          DB_HOST=db
-          DB_PORT=5432
-          DB_USER=${{ secrets.DB_USER }}
-          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-          DB_NAME=${{ secrets.DB_NAME }}
-          JWT_SECRET=${{ secrets.JWT_SECRET }}
-          MINIO_ROOT_USER=${{ secrets.MINIO_ROOT_USER }}
-          MINIO_ROOT_PASSWORD=${{ secrets.MINIO_ROOT_PASSWORD }}
-          MINIO_ENDPOINT=minio:9000
-          MINIO_ACCESS_KEY=${{ secrets.MINIO_ROOT_USER }}
-          MINIO_SECRET_KEY=${{ secrets.MINIO_ROOT_PASSWORD }}
-          MINIO_USE_SSL=false
-          ADMIN_USERNAME=${{ secrets.ADMIN_USERNAME }}
-          ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
-          VITE_API_BASE=${{ secrets.VITE_API_BASE }}
-          VITE_CONTACT_EMAIL=${{ secrets.VITE_CONTACT_EMAIL || vars.VITE_CONTACT_EMAIL }}
-          VITE_INSTAGRAM_URL=${{ secrets.VITE_INSTAGRAM_URL || vars.VITE_INSTAGRAM_URL }}
-          VITE_TWITTER_URL=${{ secrets.VITE_TWITTER_URL || vars.VITE_TWITTER_URL }}
-          SERVER_NAME=${{ secrets.SERVER_NAME }}
-          ENVEOF
-            
-            # Update database init script with admin credentials
-            sed -i "s/VALUES ('admin', 'password')/VALUES ('${{ secrets.ADMIN_USERNAME }}', '${{ secrets.ADMIN_PASSWORD }}')/g" "$DEPLOY_DIR/db/init/init.sql"
-            
-            # Deploy with Docker Compose
-            cd "$DEPLOY_DIR/deploy"
-            docker compose -p portfolio-lisa -f docker-compose.prod.yml --env-file "$DEPLOY_DIR/.env" down --remove-orphans || true
-            docker compose -p portfolio-lisa -f docker-compose.prod.yml --env-file "$DEPLOY_DIR/.env" up -d --build --remove-orphans
-            
-            # Wait for services to start
-            sleep 15
-            
-            # Ensure database user exists and seed admin user
-            # First, create the user if it doesn't exist (connect as postgres superuser)
-            docker compose -p portfolio-lisa -f docker-compose.prod.yml --env-file "$DEPLOY_DIR/.env" exec -T db psql -U postgres -d postgres -c "CREATE USER ${{ secrets.DB_USER }} WITH PASSWORD '${{ secrets.DB_PASSWORD }}' CREATEDB;" || true
-            docker compose -p portfolio-lisa -f docker-compose.prod.yml --env-file "$DEPLOY_DIR/.env" exec -T db psql -U postgres -d postgres -c "GRANT ALL PRIVILEGES ON DATABASE ${{ secrets.DB_NAME }} TO ${{ secrets.DB_USER }};" || true
-            
-            # Now run migrations through the app (migrations will run automatically on app startup)
-            echo "✅ Database user ensured, migrations will run on app startup"
-            
-            # Verify deployment
-            if docker compose -p portfolio-lisa -f docker-compose.prod.yml --env-file "$DEPLOY_DIR/.env" ps | grep -q "Up"; then
-              echo "✅ Deployment successful"
-              docker compose -p portfolio-lisa -f docker-compose.prod.yml --env-file "$DEPLOY_DIR/.env" ps
-            else
-              echo "❌ Deployment failed"
-              docker compose -p portfolio-lisa -f docker-compose.prod.yml --env-file "$DEPLOY_DIR/.env" logs --tail=50
-              exit 1
-            fi
-            
-            # Cleanup .env
-            rm -f "$DEPLOY_DIR/.env"
-            
-            echo "🎉 Deployment completed successfully!"
-          EOF
 
+      # Secrets travel over ssh stdin, never in argv or the remote environment,
+      # so they are not visible in the remote process list. deploy.sh moves the
+      # file into place and removes it on every exit path.
+      - name: Upload environment file (staging)
+        if: needs.resolve.outputs.environment == 'staging'
+        env:
+          # Each falls back to the shared repo secret. Define any STAGING_* secret
+          # later to isolate staging from production credentials without touching
+          # this workflow.
+          ENV_CONTENT: |
+            DB_USER=${{ secrets.STAGING_DB_USER || secrets.DB_USER }}
+            DB_PASSWORD=${{ secrets.STAGING_DB_PASSWORD || secrets.DB_PASSWORD }}
+            DB_NAME=${{ secrets.STAGING_DB_NAME || secrets.DB_NAME }}
+            JWT_SECRET=${{ secrets.STAGING_JWT_SECRET || secrets.JWT_SECRET }}
+            MINIO_ROOT_USER=${{ secrets.STAGING_MINIO_ROOT_USER || secrets.MINIO_ROOT_USER }}
+            MINIO_ROOT_PASSWORD=${{ secrets.STAGING_MINIO_ROOT_PASSWORD || secrets.MINIO_ROOT_PASSWORD }}
+            ADMIN_USERNAME=${{ secrets.STAGING_ADMIN_USERNAME || secrets.ADMIN_USERNAME }}
+            ADMIN_PASSWORD=${{ secrets.STAGING_ADMIN_PASSWORD || secrets.ADMIN_PASSWORD }}
+            SERVER_NAME=${{ secrets.STAGING_SERVER_NAME || secrets.SERVER_NAME }}
+            VITE_CONTACT_EMAIL=${{ secrets.VITE_CONTACT_EMAIL || vars.VITE_CONTACT_EMAIL }}
+            VITE_INSTAGRAM_URL=${{ secrets.VITE_INSTAGRAM_URL || vars.VITE_INSTAGRAM_URL }}
+            VITE_TWITTER_URL=${{ secrets.VITE_TWITTER_URL || vars.VITE_TWITTER_URL }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$ENV_CONTENT" | ssh -o StrictHostKeyChecking=accept-new \
+            "$SSH_TARGET" "umask 077 && cat > \"\$HOME/.portfolio-lisa-staging.env\""
+
+      - name: Upload environment file (production)
+        if: needs.resolve.outputs.environment == 'production'
+        env:
+          ENV_CONTENT: |
+            DB_USER=${{ secrets.DB_USER }}
+            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            DB_NAME=${{ secrets.DB_NAME }}
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            MINIO_ROOT_USER=${{ secrets.MINIO_ROOT_USER }}
+            MINIO_ROOT_PASSWORD=${{ secrets.MINIO_ROOT_PASSWORD }}
+            ADMIN_USERNAME=${{ secrets.ADMIN_USERNAME }}
+            ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
+            SERVER_NAME=${{ secrets.SERVER_NAME }}
+            VITE_CONTACT_EMAIL=${{ secrets.VITE_CONTACT_EMAIL || vars.VITE_CONTACT_EMAIL }}
+            VITE_INSTAGRAM_URL=${{ secrets.VITE_INSTAGRAM_URL || vars.VITE_INSTAGRAM_URL }}
+            VITE_TWITTER_URL=${{ secrets.VITE_TWITTER_URL || vars.VITE_TWITTER_URL }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$ENV_CONTENT" | ssh -o StrictHostKeyChecking=accept-new \
+            "$SSH_TARGET" "umask 077 && cat > \"\$HOME/.portfolio-lisa-production.env\""
+
+      - name: Deploy
+        env:
+          GIT_REF: ${{ needs.resolve.outputs.ref }}
+          GIT_REF_TYPE: ${{ needs.resolve.outputs.ref_type }}
+          REPO_URL: https://github.com/${{ github.repository }}.git
+        run: |
+          set -euo pipefail
+          ssh -o StrictHostKeyChecking=accept-new "$SSH_TARGET" \
+            "ENVIRONMENT='$ENVIRONMENT' REPO_URL='$REPO_URL' GIT_REF='$GIT_REF' GIT_REF_TYPE='$GIT_REF_TYPE' sh -s" \
+            < deploy/deploy.sh
+
+      # deploy.sh traps and removes the file itself, but if the ssh above never
+      # got far enough to run it, the secrets would be left sitting in $HOME.
+      - name: Remove uploaded secrets if the deploy never ran
+        if: failure()
+        run: |
+          ssh -o StrictHostKeyChecking=accept-new "$SSH_TARGET" \
+            "rm -f \"\$HOME/.portfolio-lisa-$ENVIRONMENT.env\"" || true
